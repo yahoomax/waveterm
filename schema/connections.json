@@ -63,6 +63,12 @@
         "cmd:initscript.fish": {
           "type": "string"
         },
+        "cmd:initscript.csh": {
+          "type": "string"
+        },
+        "cmd:initscript.tcsh": {
+          "type": "string"
+        },
         "ssh:user": {
           "type": "string"
         },

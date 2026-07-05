@@ -117,6 +117,26 @@ func checkCwd(cwd string) error {
 	return nil
 }
 
+func getRemoteCshIntegrationHome(shellType string, remoteHome string) (string, bool) {
+	if shellType == shellutil.ShellType_csh {
+		return fmt.Sprintf("%s/.waveterm/%s", remoteHome, shellutil.CshIntegrationDir), true
+	}
+	if shellType == shellutil.ShellType_tcsh {
+		return fmt.Sprintf("%s/.waveterm/%s", remoteHome, shellutil.TcshIntegrationDir), true
+	}
+	return "", false
+}
+
+func getLocalCshIntegrationHome(shellType string) (string, bool) {
+	if shellType == shellutil.ShellType_csh {
+		return fmt.Sprintf("%s/%s", wavebase.GetWaveDataDir(), shellutil.CshIntegrationDir), true
+	}
+	if shellType == shellutil.ShellType_tcsh {
+		return fmt.Sprintf("%s/%s", wavebase.GetWaveDataDir(), shellutil.TcshIntegrationDir), true
+	}
+	return "", false
+}
+
 type PipePty struct {
 	remoteStdinWrite *os.File
 	remoteStdoutRead *os.File
@@ -238,6 +258,10 @@ func StartWslShellProc(ctx context.Context, termSize waveobj.TermSize, cmdStr st
 			// powershell is weird about quoted path executables and requires an ampersand first
 			shellPath = "& " + shellPath
 			shellOpts = append(shellOpts, "-ExecutionPolicy", "Bypass", "-NoExit", "-File", pwshPath)
+		} else if shellType == shellutil.ShellType_csh || shellType == shellutil.ShellType_tcsh {
+			// csh/tcsh: run interactively; HOME is set below to point to our integration dir,
+			// so the shell reads $HOME/.tcshrc (or $HOME/.cshrc) on startup automatically.
+			shellOpts = append(shellOpts, "-i")
 		} else {
 			if cmdOpts.Login {
 				shellOpts = append(shellOpts, "-l")
@@ -260,6 +284,9 @@ func StartWslShellProc(ctx context.Context, termSize waveobj.TermSize, cmdStr st
 		zshDir := fmt.Sprintf("~/.waveterm/%s", shellutil.ZshIntegrationDir)
 		conn.Infof(ctx, "setting ZDOTDIR to %s\n", zshDir)
 		cmdCombined = fmt.Sprintf(`ZDOTDIR=%s %s`, zshDir, cmdCombined)
+	} else if cshHome, ok := getRemoteCshIntegrationHome(shellType, remoteInfo.HomeDir); ok {
+		conn.Infof(ctx, "setting HOME to %s for csh integration\n", cshHome)
+		cmdCombined = fmt.Sprintf(`WAVETERM_ORIG_HOME=%s HOME=%s %s`, shellutil.HardQuote(remoteInfo.HomeDir), shellutil.HardQuote(cshHome), cmdCombined)
 	}
 	packedToken, err := cmdOpts.SwapToken.PackForClient()
 	if err != nil {
@@ -445,6 +472,9 @@ func StartRemoteShellProc(ctx context.Context, logCtx context.Context, termSize 
 		zshDir := fmt.Sprintf("~/.waveterm/%s", shellutil.ZshIntegrationDir)
 		conn.Infof(logCtx, "setting ZDOTDIR to %s\n", zshDir)
 		cmdCombined = fmt.Sprintf(`ZDOTDIR=%s %s`, zshDir, cmdCombined)
+	} else if cshHome, ok := getRemoteCshIntegrationHome(shellType, remoteInfo.HomeDir); ok {
+		conn.Infof(logCtx, "setting HOME to %s for csh integration\n", cshHome)
+		cmdCombined = fmt.Sprintf(`WAVETERM_ORIG_HOME=%s HOME=%s %s`, shellutil.HardQuote(remoteInfo.HomeDir), shellutil.HardQuote(cshHome), cmdCombined)
 	}
 	packedToken, err := cmdOpts.SwapToken.PackForClient()
 	if err != nil {
@@ -546,6 +576,10 @@ func StartRemoteShellJob(ctx context.Context, logCtx context.Context, termSize w
 		zshDir := fmt.Sprintf("%s/.waveterm/%s", remoteInfo.HomeDir, shellutil.ZshIntegrationDir)
 		conn.Infof(logCtx, "setting ZDOTDIR to %s\n", zshDir)
 		env["ZDOTDIR"] = zshDir
+	} else if cshHome, ok := getRemoteCshIntegrationHome(shellType, remoteInfo.HomeDir); ok {
+		conn.Infof(logCtx, "setting HOME to %s for csh integration\n", cshHome)
+		env["WAVETERM_ORIG_HOME"] = remoteInfo.HomeDir
+		env["HOME"] = cshHome
 	}
 	if cmdOpts.SwapToken != nil {
 		packedToken, err := cmdOpts.SwapToken.PackForClient()
@@ -622,6 +656,8 @@ func StartLocalShellProc(logCtx context.Context, termSize waveobj.TermSize, cmdS
 		ecmd.Env = os.Environ()
 		if shellType == shellutil.ShellType_zsh {
 			shellutil.UpdateCmdEnv(ecmd, map[string]string{"ZDOTDIR": shellutil.GetLocalZshZDotDir()})
+		} else if cshHome, ok := getLocalCshIntegrationHome(shellType); ok {
+			shellutil.UpdateCmdEnv(ecmd, map[string]string{"WAVETERM_ORIG_HOME": wavebase.GetHomeDir(), "HOME": cshHome})
 		}
 	} else {
 		isShell = false

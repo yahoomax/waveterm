@@ -276,8 +276,12 @@ Wave is capable of injecting `wsh` in the following shells:
 - zsh
 - pwsh (powershell)
 - fish
+- csh
+- tcsh
 
 If the shell is different than those, it is possible the `wsh` command will not work by default. The easiest way to fix this at the moment is the switch the shell type. This can be done by setting the `conn:shellpath` value with a path to one of the above shells in the `connections.json` file for the connection you are trying to use. Alternatively, you can use the `chsh` command to change the shell in that connection, but this will also take effect outside of wave. Once this is done, restart wave for the changes to take effect.
+
+For `csh` / `tcsh`, shell integration works with startup scripting, token exchange, prompt-status updates, and cwd tracking. Command pre-execution hooks are shell-limited in `csh`, so command-start tracking is best-effort there. `tcsh` gets richer completion behavior than plain `csh`.
 
 #### AllowTcpForwarding in sshd
 

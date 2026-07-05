@@ -62,6 +62,8 @@ type MetaTSType struct {
 	CmdInitScriptZsh  string            `json:"cmd:initscript.zsh,omitempty"`
 	CmdInitScriptPwsh string            `json:"cmd:initscript.pwsh,omitempty"`
 	CmdInitScriptFish string            `json:"cmd:initscript.fish,omitempty"`
+	CmdInitScriptCsh  string            `json:"cmd:initscript.csh,omitempty"`
+	CmdInitScriptTcsh string            `json:"cmd:initscript.tcsh,omitempty"`
 
 	// AI options match settings
 	AiClear      bool    `json:"ai:*,omitempty"`

@@ -132,6 +132,17 @@ func encodeEnvVarsForPowerShell(env map[string]string) (string, error) {
 	return encoded, nil
 }
 
+func encodeEnvVarsForCsh(env map[string]string) (string, error) {
+	var encoded string
+	for k, v := range env {
+		if !IsValidEnvVarName(k) {
+			return "", fmt.Errorf("invalid env var name: %q", k)
+		}
+		encoded += fmt.Sprintf("setenv %s %s\n", k, HardQuote(v))
+	}
+	return encoded, nil
+}
+
 func EncodeEnvVarsForShell(shellType string, env map[string]string) (string, error) {
 	switch shellType {
 	case ShellType_bash, ShellType_zsh:
@@ -140,6 +151,8 @@ func EncodeEnvVarsForShell(shellType string, env map[string]string) (string, err
 		return encodeEnvVarsForFish(env)
 	case ShellType_pwsh:
 		return encodeEnvVarsForPowerShell(env)
+	case ShellType_csh, ShellType_tcsh:
+		return encodeEnvVarsForCsh(env)
 	default:
 		return "", fmt.Errorf("unknown or unsupported shell type for env var encoding: %s", shellType)
 	}

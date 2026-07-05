@@ -96,9 +96,9 @@ type SSHConn struct {
 
 var ConnServerCmdTemplate = strings.TrimSpace(
 	strings.Join([]string{
-		"%s version 2> /dev/null || (echo -n \"not-installed \"; uname -sm; exit 0);",
+		"%s version 2> /dev/null || echo not-installed;",
 		"exec %s connserver --conn %s %s %s",
-	}, "\n"))
+	}, " "))
 
 func IsLocalConnName(connName string) bool {
 	return strings.HasPrefix(connName, "local:") || connName == "local" || connName == ""
@@ -478,7 +478,7 @@ func (conn *SSHConn) StartConnServer(ctx context.Context, afterUpdate bool, useR
 	if useRouterMode {
 		routerFlag = "--router-domainsocket"
 	}
-	cmdStr := fmt.Sprintf(ConnServerCmdTemplate, wshPath, wshPath, shellutil.HardQuote(conn.GetName()), devFlag, routerFlag)
+	cmdStr := fmt.Sprintf(ConnServerCmdTemplate, wshPath, wshPath, conn.GetName(), devFlag, routerFlag)
 	log.Printf("starting conn controller: %q\n", cmdStr)
 	shWrappedCmdStr := fmt.Sprintf("sh -c %s", shellutil.HardQuote(cmdStr))
 	blocklogger.Debugf(ctx, "[conndebug] wrapped command:\n%s\n", shWrappedCmdStr)

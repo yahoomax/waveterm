@@ -118,6 +118,12 @@
             "cmd:initscript.fish": {
               "type": "string"
             },
+            "cmd:initscript.csh": {
+              "type": "string"
+            },
+            "cmd:initscript.tcsh": {
+              "type": "string"
+            },
             "term:fontsize": {
               "type": "integer"
             },

@@ -37,10 +37,12 @@ func hasBashInstalled(ctx context.Context, client *wsl.Distro) (bool, error) {
 		return true, nil
 	}
 
-	// note: we could also check in /bin/bash explicitly
-	// just in case that wasn't added to the path. but if
-	// that's true, we will most likely have worse
-	// problems going forward
+	// fallback: check if /bin/bash exists directly (works even if which command is broken)
+	cmd = client.WslCommand(ctx, "test -x /bin/bash && echo found")
+	out, testErr := cmd.Output()
+	if testErr == nil && len(out) != 0 && strings.TrimSpace(string(out)) == "found" {
+		return true, nil
+	}
 
 	return false, nil
 }

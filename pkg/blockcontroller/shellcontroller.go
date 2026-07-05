@@ -811,6 +811,12 @@ func getCustomInitScriptKeyCascade(shellType string) []string {
 	if shellType == "fish" {
 		return []string{waveobj.MetaKey_CmdInitScriptFish, waveobj.MetaKey_CmdInitScript}
 	}
+	if shellType == "csh" {
+		return []string{waveobj.MetaKey_CmdInitScriptCsh, waveobj.MetaKey_CmdInitScript}
+	}
+	if shellType == "tcsh" {
+		return []string{waveobj.MetaKey_CmdInitScriptTcsh, waveobj.MetaKey_CmdInitScriptCsh, waveobj.MetaKey_CmdInitScript}
+	}
 	return []string{waveobj.MetaKey_CmdInitScript}
 }
 

@@ -51,6 +51,12 @@ var (
 	//go:embed shellintegration/pwsh_wavepwsh.sh
 	PwshStartup_wavepwsh string
 
+	//go:embed shellintegration/csh_cshrc.sh
+	CshStartup_Cshrc string
+
+	//go:embed shellintegration/tcsh_tcshrc.sh
+	TcshStartup_Tcshrc string
+
 	ZshExtendedHistoryPattern = regexp.MustCompile(`^: [0-9]+:`)
 )
 
@@ -71,6 +77,8 @@ const (
 	ShellType_zsh     = "zsh"
 	ShellType_fish    = "fish"
 	ShellType_pwsh    = "pwsh"
+	ShellType_csh     = "csh"
+	ShellType_tcsh    = "tcsh"
 	ShellType_unknown = "unknown"
 )
 
@@ -80,6 +88,8 @@ const (
 	BashIntegrationDir = "shell/bash"
 	PwshIntegrationDir = "shell/pwsh"
 	FishIntegrationDir = "shell/fish"
+	CshIntegrationDir  = "shell/csh"
+	TcshIntegrationDir = "shell/tcsh"
 	WaveHomeBinDir     = "bin"
 	ZshHistoryFileName = ".zsh_history"
 )
@@ -290,6 +300,14 @@ func GetLocalWavePowershellEnv() string {
 	return filepath.Join(wavebase.GetWaveDataDir(), PwshIntegrationDir, "wavepwsh.ps1")
 }
 
+func GetLocalWaveCshRcPath() string {
+	return filepath.Join(wavebase.GetWaveDataDir(), CshIntegrationDir, ".cshrc")
+}
+
+func GetLocalWaveTcshRcPath() string {
+	return filepath.Join(wavebase.GetWaveDataDir(), TcshIntegrationDir, ".tcshrc")
+}
+
 func GetLocalZshZDotDir() string {
 	return filepath.Join(wavebase.GetWaveDataDir(), ZshIntegrationDir)
 }
@@ -376,6 +394,16 @@ func InitRcFiles(waveHome string, absWshBinDir string) error {
 	if err != nil {
 		return err
 	}
+	cshDir := filepath.Join(waveHome, CshIntegrationDir)
+	err = wavebase.CacheEnsureDir(cshDir, CshIntegrationDir, 0755, CshIntegrationDir)
+	if err != nil {
+		return err
+	}
+	tcshDir := filepath.Join(waveHome, TcshIntegrationDir)
+	err = wavebase.CacheEnsureDir(tcshDir, TcshIntegrationDir, 0755, TcshIntegrationDir)
+	if err != nil {
+		return err
+	}
 
 	var pathSep string
 	if runtime.GOOS == "windows" {
@@ -421,6 +449,14 @@ func InitRcFiles(waveHome string, absWshBinDir string) error {
 	err = utilfn.WriteTemplateToFile(filepath.Join(pwshDir, "wavepwsh.ps1"), PwshStartup_wavepwsh, params)
 	if err != nil {
 		return fmt.Errorf("error writing pwsh-integration wavepwsh.ps1: %v", err)
+	}
+	err = utilfn.WriteTemplateToFile(filepath.Join(cshDir, ".cshrc"), CshStartup_Cshrc, params)
+	if err != nil {
+		return fmt.Errorf("error writing csh-integration .cshrc: %v", err)
+	}
+	err = utilfn.WriteTemplateToFile(filepath.Join(tcshDir, ".tcshrc"), TcshStartup_Tcshrc, params)
+	if err != nil {
+		return fmt.Errorf("error writing tcsh-integration .tcshrc: %v", err)
 	}
 
 	return nil
@@ -476,6 +512,12 @@ func GetShellTypeFromShellPath(shellPath string) string {
 	if strings.Contains(shellBase, "pwsh") || strings.Contains(shellBase, "powershell") {
 		return ShellType_pwsh
 	}
+	if strings.Contains(shellBase, "tcsh") {
+		return ShellType_tcsh
+	}
+	if strings.Contains(shellBase, "csh") {
+		return ShellType_csh
+	}
 	return ShellType_unknown
 }
 
@@ -484,6 +526,7 @@ var (
 	zshVersionRegexp  = regexp.MustCompile(`\bzsh\s+(\d+\.\d+)`)
 	fishVersionRegexp = regexp.MustCompile(`\bversion\s+(\d+\.\d+)`)
 	pwshVersionRegexp = regexp.MustCompile(`(?:PowerShell\s+)?(\d+\.\d+)`)
+	cshVersionRegexp  = regexp.MustCompile(`\b(?:tcsh|csh)\s+([0-9]+\.[0-9]+(?:\.[0-9]+)?)`)
 )
 
 func DetectShellTypeAndVersion() (string, string, error) {
@@ -530,6 +573,8 @@ func getShellVersion(shellPath string, shellType string) (string, error) {
 	case ShellType_pwsh:
 		cmd = exec.CommandContext(ctx, shellPath, "--version")
 		versionRegex = pwshVersionRegexp
+	case ShellType_csh, ShellType_tcsh:
+		return getCshShellVersion(ctx, shellPath)
 	default:
 		return "", fmt.Errorf("unsupported shell type: %s", shellType)
 	}
@@ -546,6 +591,31 @@ func getShellVersion(shellPath string, shellType string) (string, error) {
 	}
 
 	return matches[1], nil
+}
+
+func getCshShellVersion(ctx context.Context, shellPath string) (string, error) {
+	cmds := []*exec.Cmd{
+		exec.CommandContext(ctx, shellPath, "--version"),
+		exec.CommandContext(ctx, shellPath, "-V"),
+		exec.CommandContext(ctx, shellPath, "-c", "echo $version"),
+	}
+	var lastErr error
+	for _, cmd := range cmds {
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		outputStr := strings.TrimSpace(string(output))
+		matches := cshVersionRegexp.FindStringSubmatch(outputStr)
+		if len(matches) >= 2 {
+			return matches[1], nil
+		}
+	}
+	if lastErr != nil {
+		return "", fmt.Errorf("failed to get version for csh shell: %w", lastErr)
+	}
+	return "", fmt.Errorf("failed to parse csh version")
 }
 
 func FixupWaveZshHistory() error {

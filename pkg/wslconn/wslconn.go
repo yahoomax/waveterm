@@ -68,9 +68,9 @@ type WslConn struct {
 
 var ConnServerCmdTemplate = strings.TrimSpace(
 	strings.Join([]string{
-		"%s version 2> /dev/null || (echo -n \"not-installed \"; uname -sm);",
+		"%s version 2> /dev/null || echo not-installed;",
 		"exec %s connserver --router --conn %s %s",
-	}, "\n"))
+	}, " "))
 
 func GetAllConnStatus() []wshrpc.ConnStatus {
 	globalLock.Lock()
@@ -271,8 +271,8 @@ func (conn *WslConn) StartConnServer(ctx context.Context, afterUpdate bool) (boo
 	if wavebase.IsDevMode() {
 		devFlag = "--dev"
 	}
-	cmdStr := fmt.Sprintf(ConnServerCmdTemplate, wshPath, wshPath, shellutil.HardQuote(conn.GetName()), devFlag)
-	shWrappedCmdStr := fmt.Sprintf("sh -c %s", shellutil.HardQuote(cmdStr))
+	cmdStr := fmt.Sprintf(ConnServerCmdTemplate, wshPath, wshPath, conn.GetName(), devFlag)
+	shWrappedCmdStr := fmt.Sprintf("/bin/bash -lc %s", shellutil.HardQuote(cmdStr))
 	cmd := client.WslCommand(connServerCtx, shWrappedCmdStr)
 	pipeRead, pipeWrite := io.Pipe()
 	inputPipeRead, inputPipeWrite := io.Pipe()
@@ -438,6 +438,7 @@ func (conn *WslConn) InstallWsh(ctx context.Context, osArchStr string) error {
 	}
 	if err != nil {
 		conn.Infof(ctx, "ERROR detecting client platform: %v\n", err)
+		return fmt.Errorf("error detecting client platform: %w", err)
 	}
 	conn.Infof(ctx, "detected remote platform os:%s arch:%s\n", clientOs, clientArch)
 	err = CpWshToRemote(ctx, client, clientOs, clientArch)

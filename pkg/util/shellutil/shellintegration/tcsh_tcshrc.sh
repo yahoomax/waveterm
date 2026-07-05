@@ -1,0 +1,54 @@
+# add wsh to path, source dynamic script from wsh token
+setenv WAVETERM_WSHBINDIR {{.WSHBINDIR}}
+setenv PATH "${WAVETERM_WSHBINDIR}:$PATH"
+
+# restore HOME before token exchange so wsh can find the domain socket
+if ($?WAVETERM_ORIG_HOME) then
+    setenv HOME "$WAVETERM_ORIG_HOME"
+    set home = "$WAVETERM_ORIG_HOME"
+    unsetenv WAVETERM_ORIG_HOME
+endif
+
+set _waveterm_token_tmpfile = "/tmp/.waveterm-init-tcsh-$$.sh"
+wsh token tcsh >! "$_waveterm_token_tmpfile"
+if (-f "$_waveterm_token_tmpfile") then
+    source "$_waveterm_token_tmpfile"
+    /bin/rm -f "$_waveterm_token_tmpfile"
+endif
+unset _waveterm_token_tmpfile
+unsetenv WAVETERM_SWAPTOKEN
+
+if (-f ~/.tcshrc) then
+    source ~/.tcshrc
+else if (-f ~/.cshrc) then
+    source ~/.cshrc
+endif
+
+if ("$PATH" !~ *"$WAVETERM_WSHBINDIR"*) then
+    setenv PATH "${WAVETERM_WSHBINDIR}:$PATH"
+endif
+unsetenv WAVETERM_WSHBINDIR
+
+# load completions if available (fail silently if wsh completion fails)
+set _waveterm_completion_file = "/tmp/wsh-completion-tcsh-$$.tmp"
+if (-x ~/.waveterm/bin/wsh) then
+    ~/.waveterm/bin/wsh completion tcsh >! "$_waveterm_completion_file"
+    if (-f "$_waveterm_completion_file") then
+        source "$_waveterm_completion_file"
+        /bin/rm -f "$_waveterm_completion_file"
+    endif
+endif
+unset _waveterm_completion_file
+
+if (! $?_WAVETERM_SI_FIRSTPROMPT) then
+    set _WAVETERM_SI_FIRSTPROMPT = 1
+endif
+
+alias _waveterm_si_blocked 'if ( $?TMUX || $?STY || "$TERM" =~ tmux* || "$TERM" =~ screen* ) echo 1; if ( ! $?TMUX && ! $?STY && "$TERM" !~ tmux* && "$TERM" !~ screen* ) echo 0'
+alias _waveterm_si_osc7 'set _waveterm_pwd = `echo "$cwd" | sed -e "s/%/%25/g" -e "s/ /%20/g" -e "s/#/%23/g" -e "s/?/%3F/g" -e "s/&/%26/g" -e "s/;/%3B/g" -e "s/+/%2B/g"`; printf "\033]7;file://localhost%s\007" "$_waveterm_pwd"; unset _waveterm_pwd'
+alias _waveterm_si_precmd 'set _waveterm_si_status = $status; if (`_waveterm_si_blocked` == 0) if ($_WAVETERM_SI_FIRSTPROMPT == 1) printf "\033]16162;M;{\x22shell\x22:\x22tcsh\x22,\x22shellversion\x22:\x22$version\x22,\x22uname\x22:\x22%s\x22,\x22integration\x22:true}\007" "`uname -smr`"; if (`_waveterm_si_blocked` == 0) if ($_WAVETERM_SI_FIRSTPROMPT != 1) printf "\033]16162;D;{\x22exitcode\x22:%d}\007" $_waveterm_si_status; if (`_waveterm_si_blocked` == 0) set _waveterm_pwd = `echo "$cwd" | sed -e "s/%/%25/g" -e "s/ /%20/g" -e "s/#/%23/g" -e "s/?/%3F/g" -e "s/&/%26/g" -e "s/;/%3B/g" -e "s/+/%2B/g"`; if (`_waveterm_si_blocked` == 0) printf "\033]7;file://localhost%s\007" "$_waveterm_pwd"; if (`_waveterm_si_blocked` == 0) unset _waveterm_pwd; if (`_waveterm_si_blocked` == 0) printf "\033]16162;A\007"; if (`_waveterm_si_blocked` == 0) if ($_WAVETERM_SI_FIRSTPROMPT == 1) set _WAVETERM_SI_FIRSTPROMPT = 0; unset _waveterm_si_status'
+alias _waveterm_si_preexec 'if (`_waveterm_si_blocked` == 0) set _waveterm_cmd64 = `printf "%s" "\!*" | base64 2>/dev/null | tr -d "\n\r"`; if (`_waveterm_si_blocked` == 0) if ("$_waveterm_cmd64" != "") printf "\033]16162;C;{\x22cmd64\x22:\x22%s\x22}\007" "$_waveterm_cmd64"; if (`_waveterm_si_blocked` == 0) if ("$_waveterm_cmd64" == "") printf "\033]16162;C\007"; if (`_waveterm_si_blocked` == 0) unset _waveterm_cmd64'
+
+# tcsh supports precmd/preexec aliases.
+alias precmd '_waveterm_si_precmd'
+alias preexec '_waveterm_si_preexec \!*'

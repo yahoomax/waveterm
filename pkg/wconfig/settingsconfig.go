@@ -404,6 +404,8 @@ type ConnKeywords struct {
 	CmdInitScriptZsh  string            `json:"cmd:initscript.zsh,omitempty"`
 	CmdInitScriptPwsh string            `json:"cmd:initscript.pwsh,omitempty"`
 	CmdInitScriptFish string            `json:"cmd:initscript.fish,omitempty"`
+	CmdInitScriptCsh  string            `json:"cmd:initscript.csh,omitempty"`
+	CmdInitScriptTcsh string            `json:"cmd:initscript.tcsh,omitempty"`
 
 	SshUser                         *string  `json:"ssh:user,omitempty"`
 	SshHostName                     *string  `json:"ssh:hostname,omitempty"`

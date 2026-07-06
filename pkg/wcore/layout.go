@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/wavetermdev/waveterm/pkg/waveobj"
+	"github.com/wavetermdev/waveterm/pkg/wconfig"
 	"github.com/wavetermdev/waveterm/pkg/wstore"
 )
 
@@ -61,12 +63,17 @@ func GetStarterLayout() PortableLayout {
 }
 
 func GetNewTabLayout() PortableLayout {
+	meta := waveobj.MetaMapType{
+		waveobj.MetaKey_View:       "term",
+		waveobj.MetaKey_Controller: "shell",
+	}
+	newTabConn := strings.TrimSpace(wconfig.GetWatcher().GetFullConfig().Settings.AppNewTabConnection)
+	if newTabConn != "" {
+		meta[waveobj.MetaKey_Connection] = newTabConn
+	}
 	return PortableLayout{
 		{IndexArr: []int{0}, BlockDef: &waveobj.BlockDef{
-			Meta: waveobj.MetaMapType{
-				waveobj.MetaKey_View:       "term",
-				waveobj.MetaKey_Controller: "shell",
-			},
+			Meta: meta,
 		}, Focused: true},
 	}
 }

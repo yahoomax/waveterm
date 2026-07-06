@@ -50,6 +50,9 @@
             "left"
           ]
         },
+        "app:newtabconnection": {
+          "type": "string"
+        },
         "feature:waveappbuilder": {
           "type": "boolean"
         },

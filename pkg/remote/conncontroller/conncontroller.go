@@ -1180,8 +1180,7 @@ func EnsureConnection(ctx context.Context, connName string) error {
 	}
 }
 
-// RunConnectionPreScriptForShell runs the prescript for a connection, regardless of whether the connection already exists
-// This is used to run prescript when a new shell block starts on an existing connection
+// RunConnectionPreScriptForShell runs conn:prescript for shell starts, including already-connected SSH connections.
 func RunConnectionPreScriptForShell(ctx context.Context, connName string) error {
 	if IsLocalConnName(connName) {
 		return nil
@@ -1192,9 +1191,8 @@ func RunConnectionPreScriptForShell(ctx context.Context, connName string) error 
 	}
 	conn := MaybeGetConn(connOpts)
 	if conn == nil {
-		return nil // Connection doesn't exist yet, skip prescript
+		return nil
 	}
-	// Run prescript regardless of connection status - this ensures it runs for each new shell
 	return conn.runConnectionPreScript(ctx, nil)
 }
 

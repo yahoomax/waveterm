@@ -230,35 +230,24 @@ func (sc *ShellController) writeMutedMessageToTerminal(msg string) {
 	}
 }
 
-// [All the other existing private methods remain exactly the same - I'm not including them all here for brevity, but they would all be copied over with sc. replacing bc. throughout]
-
 func (sc *ShellController) DoRunShellCommand(logCtx context.Context, rc *RunShellOpts, blockMeta waveobj.MetaMapType) error {
 	blocklogger.Debugf(logCtx, "[conndebug] DoRunShellCommand\n")
-	
-	// Ensure remote connection is established (this will run prescript if needed on first connection)
+
 	remoteName := blockMeta.GetString(waveobj.MetaKey_Connection, "")
-	if remoteName != "" && !conncontroller.IsLocalConnName(remoteName) && !conncontroller.IsWslConnName(remoteName) {
-		connErr := conncontroller.EnsureConnection(logCtx, remoteName)
-		if connErr != nil {
-			return fmt.Errorf("error ensuring connection %s: %w", remoteName, connErr)
-		}
-		
-		// Also run prescript for this shell block (even if connection already existed)
-		// This ensures prescript runs every time a new tab/shell is created
-		psErr := conncontroller.RunConnectionPreScriptForShell(logCtx, remoteName)
-		if psErr != nil {
-			blocklogger.Infof(logCtx, "warning: prescript error: %v\n", psErr)
-		}
+	psErr, connErr := prepareShellConnection(logCtx, remoteName)
+	if connErr != nil {
+		return fmt.Errorf("error ensuring connection %s: %w", remoteName, connErr)
 	}
-	
+	if psErr != nil {
+		blocklogger.Infof(logCtx, "warning: prescript error: %v\n", psErr)
+	}
+
 	shellProc, err := sc.setupAndStartShellProcess(logCtx, rc, blockMeta)
 	if err != nil {
 		return err
 	}
 	return sc.manageRunningShellProcess(shellProc, rc, blockMeta)
 }
-
-// [Continue with all other methods, replacing bc with sc throughout...]
 
 func (sc *ShellController) LockRunLock() bool {
 	rtn := sc.RunLock.CompareAndSwap(false, true)

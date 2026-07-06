@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -928,6 +929,43 @@ func (conn *SSHConn) getConnectionConfig() (wconfig.ConnKeywords, bool) {
 	return connSettings, true
 }
 
+func (conn *SSHConn) runConnectionPreScript(ctx context.Context, connFlags *wconfig.ConnKeywords) error {
+	var preScript string
+	if connFlags != nil {
+		preScript = strings.TrimSpace(connFlags.ConnPreScript)
+	}
+	if preScript == "" {
+		connConfig, ok := conn.getConnectionConfig()
+		if ok {
+			preScript = strings.TrimSpace(connConfig.ConnPreScript)
+		}
+	}
+	if preScript == "" {
+		return nil
+	}
+
+	shellPath := shellutil.DetectLocalShellPath()
+	shellType := shellutil.GetShellTypeFromShellPath(shellPath)
+	var cmd *exec.Cmd
+	if shellType == shellutil.ShellType_pwsh {
+		cmd = exec.Command(shellPath, "-NoProfile", "-Command", preScript)
+	} else {
+		cmd = exec.Command(shellPath, "-c", preScript)
+	}
+	err := cmd.Start()
+	if err != nil {
+		return fmt.Errorf("unable to execute conn:prescript for %q: %w", conn.GetName(), err)
+	}
+	conn.Infof(ctx, "started conn:prescript for %q\n", conn.GetName())
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			log.Printf("warning: conn:prescript for %q exited with error: %v", conn.GetName(), err)
+		}
+	}()
+	return nil
+}
+
 func (conn *SSHConn) persistWshInstalled(ctx context.Context, result WshCheckResult) {
 	conn.WshEnabled.Store(result.WshEnabled)
 	conn.SetWshError(result.WshError)
@@ -952,6 +990,11 @@ func (conn *SSHConn) persistWshInstalled(ctx context.Context, result WshCheckRes
 // returns (connect-error)
 func (conn *SSHConn) connectInternal(ctx context.Context, connFlags *wconfig.ConnKeywords) error {
 	conn.Infof(ctx, "connectInternal %s\n", conn.GetName())
+	err := conn.runConnectionPreScript(ctx, connFlags)
+	if err != nil {
+		conn.Infof(ctx, "ERROR running conn:prescript: %v\n", err)
+		return err
+	}
 	client, _, err := remote.ConnectToClient(ctx, conn.Opts, nil, 0, connFlags)
 	if err != nil {
 		conn.Infof(ctx, "ERROR ConnectToClient: %s\n", remote.SimpleMessageFromPossibleConnectionError(err))

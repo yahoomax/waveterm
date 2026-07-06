@@ -15,6 +15,9 @@
         "conn:shellpath": {
           "type": "string"
         },
+        "conn:prescript": {
+          "type": "string"
+        },
         "conn:ignoresshconfig": {
           "type": "boolean"
         },

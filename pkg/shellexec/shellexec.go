@@ -423,6 +423,10 @@ func StartRemoteShellProc(ctx context.Context, logCtx context.Context, termSize 
 			// powershell is weird about quoted path executables and requires an ampersand first
 			shellPath = "& " + shellPath
 			shellOpts = append(shellOpts, "-ExecutionPolicy", "Bypass", "-NoExit", "-File", pwshPath)
+		} else if shellType == shellutil.ShellType_csh || shellType == shellutil.ShellType_tcsh {
+			// csh/tcsh startup integration relies on HOME redirection and startup rc files,
+			// so launch interactive and avoid forcing login flags.
+			shellOpts = append(shellOpts, "-i")
 		} else {
 			if cmdOpts.Login {
 				shellOpts = append(shellOpts, "-l")
@@ -549,6 +553,10 @@ func StartRemoteShellJob(ctx context.Context, logCtx context.Context, termSize w
 		} else if shellType == shellutil.ShellType_pwsh {
 			pwshPath := fmt.Sprintf("%s/.waveterm/%s/wavepwsh.ps1", remoteInfo.HomeDir, shellutil.PwshIntegrationDir)
 			shellOpts = append(shellOpts, "-ExecutionPolicy", "Bypass", "-NoExit", "-File", pwshPath)
+		} else if shellType == shellutil.ShellType_csh || shellType == shellutil.ShellType_tcsh {
+			// csh/tcsh startup integration relies on HOME redirection and startup rc files,
+			// so launch interactive and avoid forcing login flags.
+			shellOpts = append(shellOpts, "-i")
 		} else {
 			if cmdOpts.Login {
 				shellOpts = append(shellOpts, "-l")

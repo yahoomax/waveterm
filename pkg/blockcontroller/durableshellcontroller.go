@@ -154,6 +154,9 @@ func (dsc *DurableShellController) Start(ctx context.Context, blockMeta waveobj.
 		}
 		if status == jobcontroller.JobManagerStatus_Running {
 			jobId = blockData.JobId
+		} else if status == jobcontroller.JobManagerStatus_Done {
+			log.Printf("block %q has stale durable jobId %s with done status, starting replacement job\n", dsc.BlockId, blockData.JobId)
+			// Leave jobId empty to trigger starting a replacement durable job below.
 		} else if !force {
 			log.Printf("block %q has jobId %s but manager is not running (status: %s), not starting (force=false)\n", dsc.BlockId, blockData.JobId, status)
 			return nil

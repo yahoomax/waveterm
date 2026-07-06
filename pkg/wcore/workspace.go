@@ -9,6 +9,7 @@ import (
 	"log"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -254,6 +255,10 @@ func CreateTab(ctx context.Context, workspaceId string, tabName string, activate
 		if err != nil {
 			return tab.OID, fmt.Errorf("error applying new tab layout: %w", err)
 		}
+		err = ensureNewTabConnection(ctx, tab.OID)
+		if err != nil {
+			return tab.OID, fmt.Errorf("error applying app:newtabconnection to new tab: %w", err)
+		}
 		tabBg := getTabBackground()
 		if tabBg != "" {
 			tabORef := waveobj.ORefFromWaveObj(tab)
@@ -265,6 +270,35 @@ func CreateTab(ctx context.Context, workspaceId string, tabName string, activate
 		Event: "action:createtab",
 	})
 	return tab.OID, nil
+}
+
+func ensureNewTabConnection(ctx context.Context, tabId string) error {
+	newTabConn := strings.TrimSpace(wconfig.GetWatcher().GetFullConfig().Settings.AppNewTabConnection)
+	if newTabConn == "" {
+		return nil
+	}
+	tab, err := wstore.DBMustGet[*waveobj.Tab](ctx, tabId)
+	if err != nil {
+		return fmt.Errorf("error getting tab %s: %w", tabId, err)
+	}
+	for _, blockId := range tab.BlockIds {
+		block, err := wstore.DBMustGet[*waveobj.Block](ctx, blockId)
+		if err != nil {
+			return fmt.Errorf("error getting block %s: %w", blockId, err)
+		}
+		if block.Meta.GetString(waveobj.MetaKey_Controller, "") != "shell" {
+			continue
+		}
+		if block.Meta.GetString(waveobj.MetaKey_Connection, "") != "" {
+			continue
+		}
+		if block.Meta == nil {
+			block.Meta = waveobj.MetaMapType{}
+		}
+		block.Meta[waveobj.MetaKey_Connection] = newTabConn
+		wstore.DBUpdate(ctx, block)
+	}
+	return nil
 }
 
 func createTabObj(ctx context.Context, workspaceId string, name string, meta waveobj.MetaMapType) (*waveobj.Tab, error) {

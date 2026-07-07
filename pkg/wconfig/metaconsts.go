@@ -50,6 +50,7 @@ const (
 	ConfigKey_TermGitBashPath                = "term:gitbashpath"
 	ConfigKey_TermScrollback                 = "term:scrollback"
 	ConfigKey_TermCopyOnSelect               = "term:copyonselect"
+	ConfigKey_TermPasteOnMiddleClick         = "term:pasteonmiddleclick"
 	ConfigKey_TermTransparency               = "term:transparency"
 	ConfigKey_TermAllowBracketedPaste        = "term:allowbracketedpaste"
 	ConfigKey_TermShiftEnterNewline          = "term:shiftenternewline"

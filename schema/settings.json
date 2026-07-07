@@ -137,6 +137,9 @@
         "term:copyonselect": {
           "type": "boolean"
         },
+        "term:pasteonmiddleclick": {
+          "type": "boolean"
+        },
         "term:transparency": {
           "type": "number"
         },

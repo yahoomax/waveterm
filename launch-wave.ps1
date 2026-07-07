@@ -13,6 +13,13 @@ if (Test-Path $zigBin) {
 	$env:Path = "$zigBin;$env:Path"
 }
 
+$goBin = 'C:\Program Files\Go\bin\go.exe'
+if (Test-Path $goBin) {
+	$env:CC = 'zig cc -target x86_64-windows-gnu'
+	$env:CGO_ENABLED = '1'
+	& $goBin build -o dist/bin/wavesrv.x64.exe cmd/server/main-server.go
+}
+
 $env:WAVETERM_ENVFILE = Join-Path $repoRoot '.env'
 $env:WCLOUD_PING_ENDPOINT = 'https://ping-dev.waveterm.dev/central'
 $env:WCLOUD_ENDPOINT = 'https://api-dev.waveterm.dev/central'

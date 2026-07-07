@@ -64,6 +64,7 @@ wsh editconfig
 | term:localshellpath                  | string   | set to override the default shell path for local terminals                                                                                                                                                                                                    |
 | term:localshellopts                  | string[] | set to pass additional parameters to the term:localshellpath (example: `["-NoLogo"]` for PowerShell will remove the copyright notice)                                                                                                                         |
 | term:copyonselect                    | bool     | set to false to disable terminal copy-on-select                                                                                                                                                                                                               |
+| term:pasteonmiddleclick              | bool     | set to true to paste the clipboard into the terminal on middle mouse click (defaults to false)                                                                                                                                                                |
 | term:scrollback                      | int      | size of terminal scrollback buffer, max is 10000                                                                                                                                                                                                              |
 | term:theme                           | string   | preset name of terminal theme to apply by default (default is "default-dark")                                                                                                                                                                                 |
 | term:transparency                    | float64  | set the background transparency of terminal theme (default 0.5, 0 = not transparent, 1.0 = fully transparent)                                                                                                                                                 |
@@ -156,6 +157,7 @@ For reference, this is the current default configuration (v0.14.0):
     "term:cursor": "block",
     "term:cursorblink": false,
     "term:copyonselect": true,
+    "term:pasteonmiddleclick": false,
     "term:durable": false,
     "waveai:showcloudmodes": true,
     "waveai:defaultmode": "waveai@balanced",

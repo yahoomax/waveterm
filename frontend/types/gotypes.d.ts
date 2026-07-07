@@ -1420,6 +1420,7 @@ declare global {
         "term:gitbashpath"?: string;
         "term:scrollback"?: number;
         "term:copyonselect"?: boolean;
+        "term:pasteonmiddleclick"?: boolean;
         "term:transparency"?: number;
         "term:allowbracketedpaste"?: boolean;
         "term:shiftenternewline"?: boolean;

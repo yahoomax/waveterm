@@ -322,6 +322,33 @@ export class TermWrap {
                 this.connectElem.removeEventListener("paste", pasteHandler, true);
             },
         });
+
+        let lastMiddleClickPasteTs = 0;
+        const middleClickPasteHandler = (e: MouseEvent) => {
+            if (e.button !== 1) {
+                return;
+            }
+            if (!globalStore.get(getSettingsKeyAtom("term:pasteonmiddleclick"))) {
+                return;
+            }
+            const now = Date.now();
+            if (now - lastMiddleClickPasteTs < 100) {
+                return;
+            }
+            lastMiddleClickPasteTs = now;
+            e.preventDefault();
+            e.stopPropagation();
+            this.terminal.focus();
+            setTimeout(() => {
+                getApi().nativePaste();
+            }, 0);
+        };
+        this.connectElem.addEventListener("mousedown", middleClickPasteHandler, true);
+        this.toDispose.push({
+            dispose: () => {
+                this.connectElem.removeEventListener("mousedown", middleClickPasteHandler, true);
+            },
+        });
     }
 
     getZoneId(): string {
@@ -610,6 +637,12 @@ export class TermWrap {
     }
 
     async pasteHandler(e?: ClipboardEvent): Promise<void> {
+        if (this.pasteActive) {
+            e?.preventDefault();
+            e?.stopPropagation();
+            return;
+        }
+
         this.pasteActive = true;
         e?.preventDefault();
         e?.stopPropagation();

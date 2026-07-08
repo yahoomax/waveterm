@@ -28,6 +28,5 @@ $env:WCLOUD_PING_ENDPOINT = 'https://ping-dev.waveterm.dev/central'
 $env:WCLOUD_ENDPOINT = 'https://api-dev.waveterm.dev/central'
 $env:WCLOUD_WS_ENDPOINT = 'wss://wsapi-dev.waveterm.dev'
 $env:WAVETERM_NOCONFIRMQUIT = '1'
-$env:WAVETERM_WSHFORCEUPDATE = '1'
 
 npm run dev

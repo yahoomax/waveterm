@@ -121,24 +121,28 @@ func CpWshToRemote(ctx context.Context, client *ssh.Client, clientOs string, cli
 		return fmt.Errorf("failed to prepare install command: %w", err)
 	}
 	blocklogger.Infof(ctx, "[conndebug] copying %q to remote server %q\n", wshLocalPath, wavebase.RemoteFullWshBinPath)
-	genCmd, err := genconn.MakeSSHCmdClient(client, genconn.CommandSpec{
-		Cmd: installCmd.String(),
-	})
+
+	// Use session.Start directly with the raw install command to avoid BuildShellCommand
+	// wrapping it in HardQuote (which uses double quotes), which tcsh misparses.
+	log.Printf("SSH-NEWSESSION (CpWshToRemote)\n")
+	session, err := client.NewSession()
 	if err != nil {
-		return fmt.Errorf("failed to create remote command: %w", err)
+		return fmt.Errorf("failed to create SSH session: %w", err)
 	}
-	stdin, err := genCmd.StdinPipe()
+	defer session.Close()
+
+	var stderrBuf bytes.Buffer
+	session.Stderr = &stderrBuf
+	stdin, err := session.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("failed to get stdin pipe: %w", err)
 	}
 	defer stdin.Close()
-	stderrBuf, err := genconn.MakeStderrSyncBuffer(genCmd)
-	if err != nil {
-		return fmt.Errorf("failed to get stderr pipe: %w", err)
-	}
-	if err := genCmd.Start(); err != nil {
+
+	if err := session.Start(installCmd.String()); err != nil {
 		return fmt.Errorf("failed to start remote command: %w", err)
 	}
+
 	copyDone := make(chan error, 1)
 	go func() {
 		defer close(copyDone)
@@ -149,9 +153,20 @@ func CpWshToRemote(ctx context.Context, client *ssh.Client, clientOs string, cli
 			copyDone <- nil
 		}
 	}()
-	procErr := genconn.ProcessContextWait(ctx, genCmd)
-	if procErr != nil {
-		return fmt.Errorf("remote command failed: %w (stderr: %s)", procErr, stderrBuf.String())
+
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- session.Wait()
+	}()
+
+	select {
+	case <-ctx.Done():
+		session.Close()
+		return fmt.Errorf("context cancelled waiting for remote command: %w", ctx.Err())
+	case procErr := <-waitDone:
+		if procErr != nil {
+			return fmt.Errorf("remote command failed: %w (stderr: %s)", procErr, stderrBuf.String())
+		}
 	}
 	copyErr := <-copyDone
 	if copyErr != nil {

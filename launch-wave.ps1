@@ -17,7 +17,10 @@ $goBin = 'C:\Program Files\Go\bin\go.exe'
 if (Test-Path $goBin) {
 	$env:CC = 'zig cc -target x86_64-windows-gnu'
 	$env:CGO_ENABLED = '1'
-	& $goBin build -o dist/bin/wavesrv.x64.exe cmd/server/main-server.go
+	$waveVersion = node version.cjs
+	$buildTime = Get-Date -UFormat +'%Y%m%d%H%M'
+	$ldflags = "-X main.BuildTime=$buildTime -X main.WaveVersion=$waveVersion"
+	& $goBin build -ldflags $ldflags -o dist/bin/wavesrv.x64.exe cmd/server/main-server.go
 }
 
 $env:WAVETERM_ENVFILE = Join-Path $repoRoot '.env'
@@ -25,5 +28,6 @@ $env:WCLOUD_PING_ENDPOINT = 'https://ping-dev.waveterm.dev/central'
 $env:WCLOUD_ENDPOINT = 'https://api-dev.waveterm.dev/central'
 $env:WCLOUD_WS_ENDPOINT = 'wss://wsapi-dev.waveterm.dev'
 $env:WAVETERM_NOCONFIRMQUIT = '1'
+$env:WAVETERM_WSHFORCEUPDATE = '1'
 
 npm run dev

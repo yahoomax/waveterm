@@ -291,6 +291,7 @@ tasks:
         sources:
             - "cmd/wsh/**/*.go"
             - "pkg/**/*.go"
+            - "pkg/**/*.sh"
             - package.json
         generates:
             - "dist/bin/wsh*"

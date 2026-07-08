@@ -42,8 +42,16 @@ if (! $?_WAVETERM_SI_FIRSTPROMPT) then
     set _WAVETERM_SI_FIRSTPROMPT = 1
 endif
 
+# Pre-initialize integration variables at startup to avoid undefined variable errors on Ctrl+C
+set _waveterm_pwd = ""
+set _waveterm_si_status = 0
+set _waveterm_si_block = 0
+set _waveterm_cmd64 = ""
+
 alias _waveterm_si_blocked 'if ( $?TMUX || $?STY || "$TERM" =~ tmux* || "$TERM" =~ screen* ) echo 1; if ( ! $?TMUX && ! $?STY && "$TERM" !~ tmux* && "$TERM" !~ screen* ) echo 0'
-alias _waveterm_si_precmd 'set _waveterm_si_status = $status; set _waveterm_si_block = `_waveterm_si_blocked`; if ("$_waveterm_si_block" == "0") if ($_WAVETERM_SI_FIRSTPROMPT == 1) printf "\033]16162;M;{\x22shell\x22:\x22csh\x22,\x22shellversion\x22:\x22$version\x22,\x22uname\x22:\x22%s\x22,\x22integration\x22:true}\007" "`uname -smr`"; if ("$_waveterm_si_block" == "0") if ($_WAVETERM_SI_FIRSTPROMPT != 1) printf "\033]16162;D;{\x22exitcode\x22:%d}\007" $_waveterm_si_status; if ("$_waveterm_si_block" == "0") set _waveterm_pwd = `echo "$cwd" | sed -e "s/%/%25/g" -e "s/ /%20/g" -e "s/#/%23/g" -e "s/?/%3F/g" -e "s/&/%26/g" -e "s/;/%3B/g" -e "s/+/%2B/g"`; if ("$_waveterm_si_block" == "0") printf "\033]7;file://localhost%s\007" "$_waveterm_pwd"; if ("$_waveterm_si_block" == "0") unset _waveterm_pwd; if ("$_waveterm_si_block" == "0") printf "\033]16162;A\007"; if ("$_waveterm_si_block" == "0") if ($_WAVETERM_SI_FIRSTPROMPT == 1) set _WAVETERM_SI_FIRSTPROMPT = 0; unset _waveterm_si_block; unset _waveterm_si_status'
+
+# Sequential checks avoid csh parse-time undefined-variable faults on Ctrl+C.
+alias _waveterm_si_precmd 'set _waveterm_si_status = $status; set _waveterm_si_block = `_waveterm_si_blocked`; if ("$_waveterm_si_block" == "0") if ($_WAVETERM_SI_FIRSTPROMPT == 1) printf "\033]16162;M;{\x22shell\x22:\x22csh\x22,\x22shellversion\x22:\x22$version\x22,\x22uname\x22:\x22%s\x22,\x22integration\x22:true}\007" "`uname -smr`"; if ("$_waveterm_si_block" == "0") if ($_WAVETERM_SI_FIRSTPROMPT != 1) printf "\033]16162;D;{\x22exitcode\x22:%d}\007" $_waveterm_si_status; if ("$_waveterm_si_block" == "0") set _waveterm_pwd = `echo "$cwd" | sed -e "s/%/%25/g" -e "s/ /%20/g" -e "s/#/%23/g" -e "s/?/%3F/g" -e "s/&/%26/g" -e "s/;/%3B/g" -e "s/+/%2B/g"`; if ("$_waveterm_si_block" == "0") if ($?_waveterm_pwd) if ("$_waveterm_pwd" != "") printf "\033]7;file://localhost%s\007" "$_waveterm_pwd"; if ("$_waveterm_si_block" == "0") printf "\033]16162;A\007"; if ("$_waveterm_si_block" == "0") if ($_WAVETERM_SI_FIRSTPROMPT == 1) set _WAVETERM_SI_FIRSTPROMPT = 0'
 
 # csh does not provide preexec hooks; prompt-time integration is best effort.
 set prompt = '`_waveterm_si_precmd`% '

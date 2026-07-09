@@ -1182,6 +1182,7 @@ declare global {
         "term:localshellpath"?: string;
         "term:localshellopts"?: string[];
         "term:scrollback"?: number;
+        "term:touchscroll"?: boolean;
         "term:vdomblockid"?: string;
         "term:vdomtoolbarblockid"?: string;
         "term:transparency"?: number;
@@ -1421,6 +1422,7 @@ declare global {
         "term:scrollback"?: number;
         "term:copyonselect"?: boolean;
         "term:pasteonmiddleclick"?: boolean;
+        "term:touchscroll"?: boolean;
         "term:transparency"?: number;
         "term:allowbracketedpaste"?: boolean;
         "term:shiftenternewline"?: boolean;

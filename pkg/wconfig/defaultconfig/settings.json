@@ -37,6 +37,7 @@
 	"term:cursorblink": false,
 	"term:copyonselect": true,
 	"term:pasteonmiddleclick": false,
+	"term:touchscroll": true,
 	"term:trimtrailingwhitespace": true,
 	"term:durable": false,
 	"waveai:showcloudmodes": true,

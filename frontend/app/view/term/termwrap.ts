@@ -349,6 +349,96 @@ export class TermWrap {
                 this.connectElem.removeEventListener("mousedown", middleClickPasteHandler, true);
             },
         });
+        this.toDispose.push(this.attachTouchScrollHandler());
+    }
+
+    private isTouchScrollEnabled(): boolean {
+        return globalStore.get(getOverrideConfigAtom(this.blockId, "term:touchscroll")) !== false;
+    }
+
+    private getTouchScrollLineHeight(): number {
+        const rowElem = this.connectElem.querySelector(".xterm-rows > div") as HTMLElement | null;
+        if (rowElem?.offsetHeight) {
+            return rowElem.offsetHeight;
+        }
+        const fontSize = this.terminal.options.fontSize ?? 12;
+        return fontSize * 1.35;
+    }
+
+    private attachTouchScrollHandler(): TermTypes.IDisposable {
+        let activeTouchId: number | null = null;
+        let lastY: number | null = null;
+        let accumulatedPx = 0;
+
+        const resetTouch = () => {
+            activeTouchId = null;
+            lastY = null;
+            accumulatedPx = 0;
+        };
+
+        const onTouchStart = (e: TouchEvent) => {
+            if (!this.isTouchScrollEnabled() || e.touches.length !== 1) {
+                return;
+            }
+            this.connectElem.classList.add("term-touchscroll-enabled");
+            const touch = e.touches[0];
+            activeTouchId = touch.identifier;
+            lastY = touch.clientY;
+            accumulatedPx = 0;
+        };
+
+        const onTouchMove = (e: TouchEvent) => {
+            if (!this.isTouchScrollEnabled() || activeTouchId == null) {
+                return;
+            }
+            if (e.touches.length !== 1) {
+                resetTouch();
+                return;
+            }
+            const touch = e.touches[0];
+            if (touch.identifier !== activeTouchId) {
+                return;
+            }
+            e.preventDefault();
+            const deltaY = lastY! - touch.clientY;
+            lastY = touch.clientY;
+            accumulatedPx += deltaY;
+            const lineHeight = this.getTouchScrollLineHeight();
+            const lines = Math.trunc(accumulatedPx / lineHeight);
+            if (lines !== 0) {
+                this.terminal.scrollLines(lines);
+                accumulatedPx -= lines * lineHeight;
+            }
+        };
+
+        const onTouchEnd = (e: TouchEvent) => {
+            if (activeTouchId == null) {
+                return;
+            }
+            const ended = Array.from(e.changedTouches).some((t) => t.identifier === activeTouchId);
+            if (ended) {
+                resetTouch();
+            }
+        };
+
+        const touchOpts: AddEventListenerOptions = { passive: false };
+        if (this.isTouchScrollEnabled()) {
+            this.connectElem.classList.add("term-touchscroll-enabled");
+        }
+        this.connectElem.addEventListener("touchstart", onTouchStart, touchOpts);
+        this.connectElem.addEventListener("touchmove", onTouchMove, touchOpts);
+        this.connectElem.addEventListener("touchend", onTouchEnd);
+        this.connectElem.addEventListener("touchcancel", onTouchEnd);
+
+        return {
+            dispose: () => {
+                this.connectElem.classList.remove("term-touchscroll-enabled");
+                this.connectElem.removeEventListener("touchstart", onTouchStart);
+                this.connectElem.removeEventListener("touchmove", onTouchMove);
+                this.connectElem.removeEventListener("touchend", onTouchEnd);
+                this.connectElem.removeEventListener("touchcancel", onTouchEnd);
+            },
+        };
     }
 
     getZoneId(): string {

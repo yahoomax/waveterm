@@ -102,6 +102,7 @@ type SettingsType struct {
 	TermScrollback          *int64   `json:"term:scrollback,omitempty"`
 	TermCopyOnSelect        *bool    `json:"term:copyonselect,omitempty"`
 	TermPasteOnMiddleClick  *bool    `json:"term:pasteonmiddleclick,omitempty"`
+	TermTouchScroll         *bool    `json:"term:touchscroll,omitempty"`
 	TermTransparency        *float64 `json:"term:transparency,omitempty"`
 	TermAllowBracketedPaste *bool    `json:"term:allowbracketedpaste,omitempty"`
 	TermShiftEnterNewline   *bool    `json:"term:shiftenternewline,omitempty"`

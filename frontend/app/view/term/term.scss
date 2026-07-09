@@ -60,6 +60,15 @@
         overflow: hidden;
         line-height: 1;
         margin: 5px 1px 5px 4px;
+
+        &.term-touchscroll-enabled {
+            touch-action: none;
+
+            .terminal,
+            .xterm {
+                touch-action: none;
+            }
+        }
     }
 
     .term-htmlelem {

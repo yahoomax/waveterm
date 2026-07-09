@@ -140,6 +140,9 @@
         "term:pasteonmiddleclick": {
           "type": "boolean"
         },
+        "term:touchscroll": {
+          "type": "boolean"
+        },
         "term:transparency": {
           "type": "number"
         },

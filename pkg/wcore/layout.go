@@ -34,13 +34,22 @@ type PortableLayout []struct {
 	Focused  bool              `json:"focused"`
 }
 
+func getDefaultShellBlockMeta() waveobj.MetaMapType {
+	meta := waveobj.MetaMapType{
+		waveobj.MetaKey_View:       "term",
+		waveobj.MetaKey_Controller: "shell",
+	}
+	newTabConn := strings.TrimSpace(wconfig.GetWatcher().GetFullConfig().Settings.AppNewTabConnection)
+	if newTabConn != "" {
+		meta[waveobj.MetaKey_Connection] = newTabConn
+	}
+	return meta
+}
+
 func GetStarterLayout() PortableLayout {
 	return PortableLayout{
 		{IndexArr: []int{0}, BlockDef: &waveobj.BlockDef{
-			Meta: waveobj.MetaMapType{
-				waveobj.MetaKey_View:       "term",
-				waveobj.MetaKey_Controller: "shell",
-			},
+			Meta: getDefaultShellBlockMeta(),
 		}, Focused: true},
 		{IndexArr: []int{1}, BlockDef: &waveobj.BlockDef{
 			Meta: waveobj.MetaMapType{
@@ -63,17 +72,9 @@ func GetStarterLayout() PortableLayout {
 }
 
 func GetNewTabLayout() PortableLayout {
-	meta := waveobj.MetaMapType{
-		waveobj.MetaKey_View:       "term",
-		waveobj.MetaKey_Controller: "shell",
-	}
-	newTabConn := strings.TrimSpace(wconfig.GetWatcher().GetFullConfig().Settings.AppNewTabConnection)
-	if newTabConn != "" {
-		meta[waveobj.MetaKey_Connection] = newTabConn
-	}
 	return PortableLayout{
 		{IndexArr: []int{0}, BlockDef: &waveobj.BlockDef{
-			Meta: meta,
+			Meta: getDefaultShellBlockMeta(),
 		}, Focused: true},
 	}
 }
@@ -179,6 +180,10 @@ func BootstrapStarterLayout(ctx context.Context) error {
 	err = ApplyPortableLayout(ctx, tabId, starterLayout, false)
 	if err != nil {
 		return fmt.Errorf("error applying starter layout: %w", err)
+	}
+	_, err = ensureNewTabConnection(ctx, tabId)
+	if err != nil {
+		return fmt.Errorf("error applying app:newtabconnection to starter tab: %w", err)
 	}
 
 	return nil

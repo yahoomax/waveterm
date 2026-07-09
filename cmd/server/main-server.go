@@ -118,6 +118,50 @@ func startConfigWatcher() {
 	}
 }
 
+func resyncBlocksForNewTabConnection(updated map[string][]string) {
+	for tabId, blockIds := range updated {
+		for _, blockId := range blockIds {
+			tabIdCopy := tabId
+			blockIdCopy := blockId
+			go func() {
+				defer func() {
+					panichandler.PanicHandler("resyncBlocksForNewTabConnection", recover())
+				}()
+				ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancelFn()
+				err := blockcontroller.ResyncController(ctx, tabIdCopy, blockIdCopy, nil, true)
+				if err != nil {
+					log.Printf("error resyncing block %s for app:newtabconnection: %v\n", blockIdCopy, err)
+				}
+			}()
+		}
+	}
+}
+
+func applyNewTabConnections() {
+	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFn()
+	updated, err := wcore.ApplyNewTabConnectionsToAllTabs(ctx)
+	if err != nil {
+		log.Printf("error applying app:newtabconnection on startup: %v\n", err)
+		return
+	}
+	if len(updated) > 0 {
+		log.Printf("applied app:newtabconnection to %d tab(s)\n", len(updated))
+		resyncBlocksForNewTabConnection(updated)
+	}
+}
+
+func registerNewTabConnectionConfigHandler() {
+	watcher := wconfig.GetWatcher()
+	if watcher == nil {
+		return
+	}
+	watcher.RegisterUpdateHandler(func(_ wconfig.FullConfigType) {
+		applyNewTabConnections()
+	})
+}
+
 func telemetryLoop() {
 	defer func() {
 		panichandler.PanicHandler("telemetryLoop", recover())
@@ -575,6 +619,8 @@ func main() {
 	blocklogger.InitBlockLogger()
 	jobcontroller.InitJobController()
 	blockcontroller.InitBlockController()
+	registerNewTabConnectionConfigHandler()
+	applyNewTabConnections()
 	err = wcore.InitBadgeStore()
 	if err != nil {
 		log.Printf("error initializing badge store: %v\n", err)

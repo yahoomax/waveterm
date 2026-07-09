@@ -255,7 +255,7 @@ func CreateTab(ctx context.Context, workspaceId string, tabName string, activate
 		if err != nil {
 			return tab.OID, fmt.Errorf("error applying new tab layout: %w", err)
 		}
-		err = ensureNewTabConnection(ctx, tab.OID)
+		_, err = ensureNewTabConnection(ctx, tab.OID)
 		if err != nil {
 			return tab.OID, fmt.Errorf("error applying app:newtabconnection to new tab: %w", err)
 		}
@@ -272,19 +272,22 @@ func CreateTab(ctx context.Context, workspaceId string, tabName string, activate
 	return tab.OID, nil
 }
 
-func ensureNewTabConnection(ctx context.Context, tabId string) error {
+// ensureNewTabConnection applies app:newtabconnection to shell blocks in a tab that
+// do not already have a connection set. Returns the block ids that were updated.
+func ensureNewTabConnection(ctx context.Context, tabId string) ([]string, error) {
 	newTabConn := strings.TrimSpace(wconfig.GetWatcher().GetFullConfig().Settings.AppNewTabConnection)
 	if newTabConn == "" {
-		return nil
+		return nil, nil
 	}
 	tab, err := wstore.DBMustGet[*waveobj.Tab](ctx, tabId)
 	if err != nil {
-		return fmt.Errorf("error getting tab %s: %w", tabId, err)
+		return nil, fmt.Errorf("error getting tab %s: %w", tabId, err)
 	}
+	var updatedBlockIds []string
 	for _, blockId := range tab.BlockIds {
 		block, err := wstore.DBMustGet[*waveobj.Block](ctx, blockId)
 		if err != nil {
-			return fmt.Errorf("error getting block %s: %w", blockId, err)
+			return nil, fmt.Errorf("error getting block %s: %w", blockId, err)
 		}
 		if block.Meta.GetString(waveobj.MetaKey_Controller, "") != "shell" {
 			continue
@@ -297,8 +300,29 @@ func ensureNewTabConnection(ctx context.Context, tabId string) error {
 		}
 		block.Meta[waveobj.MetaKey_Connection] = newTabConn
 		wstore.DBUpdate(ctx, block)
+		updatedBlockIds = append(updatedBlockIds, blockId)
 	}
-	return nil
+	return updatedBlockIds, nil
+}
+
+// ApplyNewTabConnectionsToAllTabs applies app:newtabconnection to shell blocks across
+// all tabs that do not already have a connection. Returns tabId -> updated block ids.
+func ApplyNewTabConnectionsToAllTabs(ctx context.Context) (map[string][]string, error) {
+	tabs, err := wstore.DBGetAllObjsByType[*waveobj.Tab](ctx, waveobj.OType_Tab)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tabs: %w", err)
+	}
+	updated := make(map[string][]string)
+	for _, tab := range tabs {
+		blockIds, err := ensureNewTabConnection(ctx, tab.OID)
+		if err != nil {
+			return updated, err
+		}
+		if len(blockIds) > 0 {
+			updated[tab.OID] = blockIds
+		}
+	}
+	return updated, nil
 }
 
 func createTabObj(ctx context.Context, workspaceId string, name string, meta waveobj.MetaMapType) (*waveobj.Tab, error) {

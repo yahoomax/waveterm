@@ -9,10 +9,12 @@ import (
 	"log"
 	"time"
 
+	"github.com/wavetermdev/waveterm/pkg/panichandler"
 	"github.com/wavetermdev/waveterm/pkg/remote/conncontroller"
 	"github.com/wavetermdev/waveterm/pkg/waveobj"
 	"github.com/wavetermdev/waveterm/pkg/wconfig"
 	"github.com/wavetermdev/waveterm/pkg/wcore"
+	"github.com/wavetermdev/waveterm/pkg/wps"
 	"github.com/wavetermdev/waveterm/pkg/wshrpc"
 	"github.com/wavetermdev/waveterm/pkg/wslconn"
 	"github.com/wavetermdev/waveterm/pkg/wstore"
@@ -63,7 +65,14 @@ func (cs *ClientService) AgreeTos(ctx context.Context) (waveobj.UpdatesRtnType, 
 		return nil, fmt.Errorf("error updating client data: %w", err)
 	}
 	wcore.BootstrapStarterLayout(ctx)
-	return waveobj.ContextGetUpdatesRtn(ctx), nil
+	updates := waveobj.ContextGetUpdatesRtn(ctx)
+	go func() {
+		defer func() {
+			panichandler.PanicHandler("ClientService:AgreeTos:SendUpdateEvents", recover())
+		}()
+		wps.Broker.SendUpdateEvents(updates)
+	}()
+	return updates, nil
 }
 
 func (cs *ClientService) TelemetryUpdate(ctx context.Context, telemetryEnabled bool) error {

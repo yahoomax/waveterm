@@ -138,7 +138,7 @@ func resyncBlocksForNewTabConnection(updated map[string][]string) {
 	}
 }
 
-func applyNewTabConnections() {
+func applyNewTabConnections(resync bool) {
 	ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFn()
 	updated, err := wcore.ApplyNewTabConnectionsToAllTabs(ctx)
@@ -148,7 +148,9 @@ func applyNewTabConnections() {
 	}
 	if len(updated) > 0 {
 		log.Printf("applied app:newtabconnection to %d tab(s)\n", len(updated))
-		resyncBlocksForNewTabConnection(updated)
+		if resync {
+			resyncBlocksForNewTabConnection(updated)
+		}
 	}
 }
 
@@ -158,7 +160,7 @@ func registerNewTabConnectionConfigHandler() {
 		return
 	}
 	watcher.RegisterUpdateHandler(func(_ wconfig.FullConfigType) {
-		applyNewTabConnections()
+		applyNewTabConnections(true)
 	})
 }
 
@@ -620,7 +622,7 @@ func main() {
 	jobcontroller.InitJobController()
 	blockcontroller.InitBlockController()
 	registerNewTabConnectionConfigHandler()
-	applyNewTabConnections()
+	applyNewTabConnections(false)
 	err = wcore.InitBadgeStore()
 	if err != nil {
 		log.Printf("error initializing badge store: %v\n", err)

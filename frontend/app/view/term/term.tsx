@@ -47,6 +47,7 @@ TermClaudeIcon.displayName = "TermClaudeIcon";
 
 const TermResyncHandler = React.memo(({ blockId, model }: TerminalViewProps) => {
     const connStatus = jotai.useAtomValue(model.connStatus);
+    const shellProcStatus = jotai.useAtomValue(model.shellProcStatus);
     const [lastConnStatus, setLastConnStatus] = React.useState<ConnStatus>(connStatus);
 
     React.useEffect(() => {
@@ -60,9 +61,16 @@ const TermResyncHandler = React.memo(({ blockId, model }: TerminalViewProps) => 
         if (isConnected == wasConnected && curConnName == lastConnName) {
             return;
         }
+        // T1 often gets an initial resize resync before the SSH connection is ready, then a
+        // second resync when conn status flips to connected. Skip the duplicate when the
+        // shell is already running so conn:prescript (e.g. open VS Code) only runs once.
+        if (isConnected && !wasConnected && shellProcStatus === "running") {
+            setLastConnStatus(connStatus);
+            return;
+        }
         model.termRef.current?.resyncController("resync handler");
         setLastConnStatus(connStatus);
-    }, [connStatus]);
+    }, [connStatus, shellProcStatus]);
 
     return null;
 });

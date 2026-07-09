@@ -234,7 +234,7 @@ func (sc *ShellController) DoRunShellCommand(logCtx context.Context, rc *RunShel
 	blocklogger.Debugf(logCtx, "[conndebug] DoRunShellCommand\n")
 
 	remoteName := blockMeta.GetString(waveobj.MetaKey_Connection, "")
-	psErr, connErr := prepareShellConnection(logCtx, remoteName)
+	psErr, connErr := prepareShellConnection(logCtx, sc.BlockId, remoteName)
 	if connErr != nil {
 		return fmt.Errorf("error ensuring connection %s: %w", remoteName, connErr)
 	}

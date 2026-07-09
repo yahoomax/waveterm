@@ -990,11 +990,6 @@ func (conn *SSHConn) persistWshInstalled(ctx context.Context, result WshCheckRes
 // returns (connect-error)
 func (conn *SSHConn) connectInternal(ctx context.Context, connFlags *wconfig.ConnKeywords) error {
 	conn.Infof(ctx, "connectInternal %s\n", conn.GetName())
-	err := conn.runConnectionPreScript(ctx, connFlags)
-	if err != nil {
-		conn.Infof(ctx, "ERROR running conn:prescript: %v\n", err)
-		return err
-	}
 	client, _, err := remote.ConnectToClient(ctx, conn.Opts, nil, 0, connFlags)
 	if err != nil {
 		conn.Infof(ctx, "ERROR ConnectToClient: %s\n", remote.SimpleMessageFromPossibleConnectionError(err))

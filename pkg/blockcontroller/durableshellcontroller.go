@@ -168,7 +168,7 @@ func (dsc *DurableShellController) Start(ctx context.Context, blockMeta waveobj.
 
 	if jobId == "" {
 		log.Printf("block %q starting new durable shell\n", dsc.BlockId)
-		psErr, connErr := prepareShellConnection(ctx, dsc.ConnName)
+		psErr, connErr := prepareShellConnection(ctx, dsc.BlockId, dsc.ConnName)
 		if connErr != nil {
 			return fmt.Errorf("error ensuring connection %s: %w", dsc.ConnName, connErr)
 		}

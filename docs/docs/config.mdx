@@ -66,6 +66,7 @@ wsh editconfig
 | term:copyonselect                    | bool     | set to false to disable terminal copy-on-select                                                                                                                                                                                                               |
 | term:pasteonmiddleclick              | bool     | set to true to paste the clipboard into the terminal on middle mouse click (defaults to false)                                                                                                                                                                |
 | term:touchscroll                     | bool     | set to false to disable touch screen scrolling in terminal blocks (defaults to true)                                                                                                                                                                          |
+| term:touchtextselect                 | bool     | set to false to disable touch screen text selection in terminal blocks (defaults to true)                                                                                                                                                                   |
 | term:scrollback                      | int      | size of terminal scrollback buffer, max is 10000                                                                                                                                                                                                              |
 | term:theme                           | string   | preset name of terminal theme to apply by default (default is "default-dark")                                                                                                                                                                                 |
 | term:transparency                    | float64  | set the background transparency of terminal theme (default 0.5, 0 = not transparent, 1.0 = fully transparent)                                                                                                                                                 |
@@ -160,6 +161,7 @@ For reference, this is the current default configuration (v0.14.0):
     "term:copyonselect": true,
     "term:pasteonmiddleclick": false,
     "term:touchscroll": true,
+    "term:touchtextselect": true,
     "term:durable": false,
     "waveai:showcloudmodes": true,
     "waveai:defaultmode": "waveai@balanced",

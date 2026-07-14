@@ -69,6 +69,22 @@
                 touch-action: none;
             }
         }
+
+        &.term-touchtextselect-enabled {
+            .terminal,
+            .xterm {
+                touch-action: manipulation;
+            }
+        }
+
+        &.term-touchtextselect-disabled {
+            .terminal,
+            .xterm {
+                touch-action: none;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+        }
     }
 
     .term-htmlelem {

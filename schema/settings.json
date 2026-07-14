@@ -143,6 +143,9 @@
         "term:touchscroll": {
           "type": "boolean"
         },
+        "term:touchtextselect": {
+          "type": "boolean"
+        },
         "term:transparency": {
           "type": "number"
         },

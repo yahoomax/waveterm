@@ -52,6 +52,7 @@ const TermCacheFileName = "cache:term:full";
 const MinDataProcessedForCache = 100 * 1024;
 export const SupportsImageInput = true;
 const MaxRepaintTransactionMs = 2000;
+const TouchScrollCommitThresholdPx = 10;
 
 // detect webgl support
 function detectWebGLSupport(): boolean {
@@ -350,10 +351,35 @@ export class TermWrap {
             },
         });
         this.toDispose.push(this.attachTouchScrollHandler());
+        this.toDispose.push(this.attachTouchTextSelectHandler());
     }
 
     private isTouchScrollEnabled(): boolean {
         return globalStore.get(getOverrideConfigAtom(this.blockId, "term:touchscroll")) !== false;
+    }
+
+    private isTouchTextSelectEnabled(): boolean {
+        return globalStore.get(getOverrideConfigAtom(this.blockId, "term:touchtextselect")) !== false;
+    }
+
+    private shouldLockTouchActionForScroll(): boolean {
+        return this.isTouchScrollEnabled() && !this.isTouchTextSelectEnabled();
+    }
+
+    private updateTouchTextSelectClass(): void {
+        const enabled = this.isTouchTextSelectEnabled();
+        this.connectElem.classList.toggle("term-touchtextselect-enabled", enabled);
+        this.connectElem.classList.toggle("term-touchtextselect-disabled", !enabled);
+    }
+
+    private attachTouchTextSelectHandler(): TermTypes.IDisposable {
+        this.updateTouchTextSelectClass();
+        return {
+            dispose: () => {
+                this.connectElem.classList.remove("term-touchtextselect-enabled");
+                this.connectElem.classList.remove("term-touchtextselect-disabled");
+            },
+        };
     }
 
     private getTouchScrollLineHeight(): number {
@@ -368,23 +394,34 @@ export class TermWrap {
     private attachTouchScrollHandler(): TermTypes.IDisposable {
         let activeTouchId: number | null = null;
         let lastY: number | null = null;
+        let startY: number | null = null;
         let accumulatedPx = 0;
+        let scrollCommitted = false;
 
         const resetTouch = () => {
             activeTouchId = null;
             lastY = null;
+            startY = null;
             accumulatedPx = 0;
+            scrollCommitted = false;
+            if (this.isTouchTextSelectEnabled()) {
+                this.connectElem.classList.remove("term-touchscroll-enabled");
+            }
         };
 
         const onTouchStart = (e: TouchEvent) => {
             if (!this.isTouchScrollEnabled() || e.touches.length !== 1) {
                 return;
             }
-            this.connectElem.classList.add("term-touchscroll-enabled");
             const touch = e.touches[0];
             activeTouchId = touch.identifier;
             lastY = touch.clientY;
+            startY = touch.clientY;
             accumulatedPx = 0;
+            scrollCommitted = this.shouldLockTouchActionForScroll();
+            if (scrollCommitted) {
+                this.connectElem.classList.add("term-touchscroll-enabled");
+            }
         };
 
         const onTouchMove = (e: TouchEvent) => {
@@ -398,6 +435,14 @@ export class TermWrap {
             const touch = e.touches[0];
             if (touch.identifier !== activeTouchId) {
                 return;
+            }
+            if (!scrollCommitted && this.isTouchTextSelectEnabled() && startY != null) {
+                const totalMove = Math.abs(touch.clientY - startY);
+                if (totalMove < TouchScrollCommitThresholdPx) {
+                    return;
+                }
+                scrollCommitted = true;
+                this.connectElem.classList.add("term-touchscroll-enabled");
             }
             e.preventDefault();
             const deltaY = lastY! - touch.clientY;
@@ -422,7 +467,7 @@ export class TermWrap {
         };
 
         const touchOpts: AddEventListenerOptions = { passive: false };
-        if (this.isTouchScrollEnabled()) {
+        if (this.shouldLockTouchActionForScroll()) {
             this.connectElem.classList.add("term-touchscroll-enabled");
         }
         this.connectElem.addEventListener("touchstart", onTouchStart, touchOpts);

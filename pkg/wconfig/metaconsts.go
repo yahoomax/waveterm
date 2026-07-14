@@ -52,6 +52,7 @@ const (
 	ConfigKey_TermCopyOnSelect               = "term:copyonselect"
 	ConfigKey_TermPasteOnMiddleClick         = "term:pasteonmiddleclick"
 	ConfigKey_TermTouchScroll                = "term:touchscroll"
+	ConfigKey_TermTouchTextSelect            = "term:touchtextselect"
 	ConfigKey_TermTransparency               = "term:transparency"
 	ConfigKey_TermAllowBracketedPaste        = "term:allowbracketedpaste"
 	ConfigKey_TermShiftEnterNewline          = "term:shiftenternewline"

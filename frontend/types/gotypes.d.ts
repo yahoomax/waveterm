@@ -1422,6 +1422,7 @@ declare global {
         "term:copyonselect"?: boolean;
         "term:pasteonmiddleclick"?: boolean;
         "term:touchscroll"?: boolean;
+        "term:touchtextselect"?: boolean;
         "term:transparency"?: number;
         "term:allowbracketedpaste"?: boolean;
         "term:shiftenternewline"?: boolean;

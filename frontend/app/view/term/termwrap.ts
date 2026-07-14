@@ -54,6 +54,8 @@ export const SupportsImageInput = true;
 const MaxRepaintTransactionMs = 2000;
 const TouchGestureCommitThresholdPx = 10;
 const TouchScrollDominanceRatio = 1.5;
+const TouchLongPressMs = 500;
+const TouchLongPressMoveTolerancePx = 10;
 
 // detect webgl support
 function detectWebGLSupport(): boolean {
@@ -123,6 +125,10 @@ export class TermWrap {
     lastMode2026ResetTs: number = 0;
     inSyncTransaction: boolean = false;
     inRepaintTransaction: boolean = false;
+    touchSelectGestureActive: boolean = false;
+    private selectionHandlesUpdateListeners = new Set<() => void>();
+    private selectionAdjustAnchor: { x: number; y: number } | null = null;
+    private selectionAdjustHandle: "start" | "end" | null = null;
 
     constructor(
         tabId: string,
@@ -352,6 +358,13 @@ export class TermWrap {
             },
         });
         this.toDispose.push(this.attachTouchInteractionHandler());
+        this.toDispose.push(
+            this.terminal.onScroll(() => {
+                if (this.terminal.hasSelection()) {
+                    this.notifySelectionHandlesUpdate();
+                }
+            })
+        );
     }
 
     private isTouchScrollEnabled(): boolean {
@@ -390,6 +403,310 @@ export class TermWrap {
         );
     }
 
+    isTouchSelectGestureActive(): boolean {
+        return this.touchSelectGestureActive;
+    }
+
+    subscribeSelectionHandlesUpdate(listener: () => void): () => void {
+        this.selectionHandlesUpdateListeners.add(listener);
+        return () => {
+            this.selectionHandlesUpdateListeners.delete(listener);
+        };
+    }
+
+    private notifySelectionHandlesUpdate(): void {
+        requestAnimationFrame(() => {
+            for (const listener of this.selectionHandlesUpdateListeners) {
+                listener();
+            }
+        });
+    }
+
+    getSelectionHandlePositions(): {
+        start: { left: number; top: number };
+        end: { left: number; top: number };
+    } | null {
+        if (!this.terminal.hasSelection()) {
+            return null;
+        }
+        const selectionPos = this.terminal.getSelectionPosition();
+        if (selectionPos == null) {
+            return null;
+        }
+        const connectRect = this.connectElem.getBoundingClientRect();
+        const selectionElem = this.terminal.element?.querySelector(".xterm-selection");
+        const selectionDivs = selectionElem
+            ? Array.from(selectionElem.querySelectorAll<HTMLElement>("div")).filter(
+                  (div) => div.offsetWidth > 0 || div.offsetHeight > 0
+              )
+            : [];
+        if (selectionDivs.length > 0) {
+            const firstRect = selectionDivs[0].getBoundingClientRect();
+            const lastRect = selectionDivs[selectionDivs.length - 1].getBoundingClientRect();
+            const forward =
+                selectionPos.start.y < selectionPos.end.y ||
+                (selectionPos.start.y === selectionPos.end.y && selectionPos.start.x <= selectionPos.end.x);
+            if (forward) {
+                return {
+                    start: { left: firstRect.left - connectRect.left, top: firstRect.top - connectRect.top },
+                    end: { left: lastRect.right - connectRect.left, top: lastRect.bottom - connectRect.top },
+                };
+            }
+            return {
+                start: { left: lastRect.right - connectRect.left, top: lastRect.bottom - connectRect.top },
+                end: { left: firstRect.left - connectRect.left, top: firstRect.top - connectRect.top },
+            };
+        }
+        const startClient = this.bufferCellToClientOffset(selectionPos.start, false);
+        const endClient = this.bufferCellToClientOffset(selectionPos.end, true);
+        return {
+            start: { left: startClient.x - connectRect.left, top: startClient.y - connectRect.top },
+            end: { left: endClient.x - connectRect.left, top: endClient.y - connectRect.top },
+        };
+    }
+
+    beginSelectionHandleAdjust(handle: "start" | "end"): void {
+        const selectionPos = this.terminal.getSelectionPosition();
+        if (selectionPos == null) {
+            return;
+        }
+        this.selectionAdjustHandle = handle;
+        this.touchSelectGestureActive = true;
+        if (handle === "start") {
+            this.selectionAdjustAnchor = { x: selectionPos.end.x, y: selectionPos.end.y };
+            return;
+        }
+        this.selectionAdjustAnchor = { x: selectionPos.start.x, y: selectionPos.start.y };
+    }
+
+    updateSelectionHandleAdjust(clientX: number, clientY: number): void {
+        if (this.selectionAdjustAnchor == null || this.selectionAdjustHandle == null) {
+            return;
+        }
+        const movingCell = this.clientToBufferCell(clientX, clientY);
+        if (movingCell == null) {
+            return;
+        }
+        this.autoScrollWhileSelecting(clientY);
+        const refreshedCell = this.clientToBufferCell(clientX, clientY);
+        if (refreshedCell == null) {
+            return;
+        }
+        if (this.selectionAdjustHandle === "start") {
+            this.applySelectionRange(refreshedCell, this.selectionAdjustAnchor);
+        } else {
+            this.applySelectionRange(this.selectionAdjustAnchor, refreshedCell);
+        }
+        this.notifySelectionHandlesUpdate();
+    }
+
+    endSelectionHandleAdjust(clientX: number, clientY: number): void {
+        this.updateSelectionHandleAdjust(clientX, clientY);
+        this.selectionAdjustHandle = null;
+        this.selectionAdjustAnchor = null;
+        this.touchSelectGestureActive = false;
+        this.notifySelectionHandlesUpdate();
+    }
+
+    private applySelectionRange(
+        start: { x: number; y: number },
+        end: { x: number; y: number }
+    ): void {
+        let rangeStart = start;
+        let rangeEnd = end;
+        if (
+            rangeStart.y > rangeEnd.y ||
+            (rangeStart.y === rangeEnd.y && rangeStart.x > rangeEnd.x)
+        ) {
+            rangeStart = end;
+            rangeEnd = start;
+        }
+        const startCol = rangeStart.x - 1;
+        const startRow = rangeStart.y - 1;
+        const endCol = rangeEnd.x - 1;
+        const endRow = rangeEnd.y - 1;
+        const cols = this.terminal.cols;
+        const length = (endRow - startRow) * cols + (endCol - startCol) + 1;
+        if (length <= 0) {
+            this.terminal.clearSelection();
+            return;
+        }
+        this.terminal.select(startCol, startRow, length);
+    }
+
+    private clientToBufferCell(clientX: number, clientY: number): { x: number; y: number } | null {
+        const screenElement = this.terminal.element?.querySelector(".xterm-screen") as HTMLElement | null;
+        if (screenElement == null) {
+            return null;
+        }
+        type XtermCore = {
+            _mouseService?: {
+                getCoords: (
+                    event: MouseEvent,
+                    element: HTMLElement,
+                    cols: number,
+                    rows: number,
+                    isSelection?: boolean
+                ) => [number, number] | undefined;
+            };
+        };
+        const core = (this.terminal as unknown as { _core?: XtermCore })._core;
+        const coords = core?._mouseService?.getCoords?.(
+            { clientX, clientY } as MouseEvent,
+            screenElement,
+            this.terminal.cols,
+            this.terminal.rows,
+            true
+        );
+        if (coords != null) {
+            const viewportY = this.terminal.buffer.active.viewportY;
+            return { x: coords[0], y: viewportY + coords[1] };
+        }
+        const charWidth = this.getCharWidth();
+        const lineHeight = this.getTouchScrollLineHeight();
+        if (charWidth <= 0 || lineHeight <= 0) {
+            return null;
+        }
+        const screenRect = screenElement.getBoundingClientRect();
+        const rowsElem = this.terminal.element?.querySelector(".xterm-rows") as HTMLElement | null;
+        const rowsTop = rowsElem?.getBoundingClientRect().top ?? screenRect.top;
+        const col = Math.floor((clientX - screenRect.left) / charWidth) + 1;
+        const rowInView = Math.floor((clientY - rowsTop) / lineHeight) + 1;
+        const viewportY = this.terminal.buffer.active.viewportY;
+        return {
+            x: Math.min(Math.max(col, 1), this.terminal.cols),
+            y: Math.min(Math.max(viewportY + rowInView, 1), this.terminal.buffer.active.length),
+        };
+    }
+
+    private selectWordAtClient(clientX: number, clientY: number): boolean {
+        const termElement = this.terminal.element;
+        if (termElement != null) {
+            termElement.dispatchEvent(
+                new MouseEvent("dblclick", {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX,
+                    clientY,
+                    view: window,
+                    detail: 2,
+                })
+            );
+            if (this.terminal.hasSelection()) {
+                return true;
+            }
+        }
+        type SelectionService = {
+            _selectWordAtCursor?: (event: MouseEvent, allowWhitespaceOnlyWord: boolean) => boolean;
+            refresh?: (immediate?: boolean) => void;
+            _fireEventIfSelectionChanged?: () => void;
+        };
+        type XtermCore = {
+            _selectionService?: SelectionService;
+        };
+        const core = (this.terminal as unknown as { _core?: XtermCore })._core;
+        const fakeEvent = { clientX, clientY, detail: 2 } as MouseEvent;
+        if (core?._selectionService?._selectWordAtCursor?.(fakeEvent, false)) {
+            core._selectionService.refresh?.(true);
+            core._selectionService._fireEventIfSelectionChanged?.();
+            return true;
+        }
+        const cell = this.clientToBufferCell(clientX, clientY);
+        if (cell == null) {
+            return false;
+        }
+        this.selectWordAtCell(cell);
+        return this.terminal.hasSelection();
+    }
+
+    private selectWordAtCell(cell: { x: number; y: number }): void {
+        const buffer = this.terminal.buffer.active;
+        const line = buffer.getLine(cell.y - 1);
+        if (line == null) {
+            return;
+        }
+        const wordSeparators = this.terminal.options.wordSeparator ?? " ()[]{}',\"`";
+        const isSeparator = (ch: string) => ch.length === 0 || wordSeparators.indexOf(ch) >= 0;
+        const lineText = line.translateToString(true);
+        let startCol = cell.x - 1;
+        let endCol = cell.x - 1;
+        while (startCol > 0 && !isSeparator(lineText[startCol - 1] ?? "")) {
+            startCol--;
+        }
+        while (endCol < lineText.length - 1 && !isSeparator(lineText[endCol + 1] ?? "")) {
+            endCol++;
+        }
+        this.applySelectionRange({ x: startCol + 1, y: cell.y }, { x: endCol + 1, y: cell.y });
+    }
+
+    private getSelectionExtendAnchor(
+        touchCell: { x: number; y: number },
+        selectionPos: { start: { x: number; y: number }; end: { x: number; y: number } }
+    ): { x: number; y: number } {
+        const distToStart =
+            Math.abs(touchCell.x - selectionPos.start.x) + Math.abs(touchCell.y - selectionPos.start.y);
+        const distToEnd = Math.abs(touchCell.x - selectionPos.end.x) + Math.abs(touchCell.y - selectionPos.end.y);
+        return distToStart <= distToEnd ? selectionPos.end : selectionPos.start;
+    }
+
+    private extendTouchSelection(
+        anchor: { x: number; y: number },
+        clientX: number,
+        clientY: number
+    ): void {
+        this.autoScrollWhileSelecting(clientY);
+        const movingCell = this.clientToBufferCell(clientX, clientY);
+        if (movingCell == null) {
+            return;
+        }
+        this.applySelectionRange(anchor, movingCell);
+    }
+
+    private autoScrollWhileSelecting(clientY: number): void {
+        const viewport = this.terminal.element?.querySelector(".xterm-viewport") as HTMLElement | null;
+        if (viewport == null) {
+            return;
+        }
+        const rect = viewport.getBoundingClientRect();
+        const edgePx = Math.max(28, this.getTouchScrollLineHeight());
+        if (clientY < rect.top + edgePx) {
+            this.terminal.scrollLines(-1);
+            return;
+        }
+        if (clientY > rect.bottom - edgePx) {
+            this.terminal.scrollLines(1);
+        }
+    }
+
+    private bufferCellToClientOffset(cell: { x: number; y: number }, endOfCell: boolean): { x: number; y: number } {
+        const lineHeight = this.getTouchScrollLineHeight();
+        const charWidth = this.getCharWidth();
+        const viewportY = this.terminal.buffer.active.viewportY;
+        const rowInView = cell.y - 1 - viewportY;
+        const col = cell.x - 1 + (endOfCell ? 1 : 0);
+        const rowsElem = this.terminal.element?.querySelector(".xterm-rows") as HTMLElement | null;
+        const screenElem =
+            (this.terminal.element?.querySelector(".xterm-screen") as HTMLElement | null) ?? this.terminal.element;
+        if (screenElem == null) {
+            return { x: 0, y: 0 };
+        }
+        const screenRect = screenElem.getBoundingClientRect();
+        const rowsTop = rowsElem?.getBoundingClientRect().top ?? screenRect.top;
+        return {
+            x: screenRect.left + col * charWidth,
+            y: rowsTop + rowInView * lineHeight + (endOfCell ? lineHeight : 0),
+        };
+    }
+
+    private getCharWidth(): number {
+        const rowElem = this.connectElem.querySelector(".xterm-rows > div") as HTMLElement | null;
+        if (rowElem != null && this.terminal.cols > 0) {
+            return rowElem.clientWidth / this.terminal.cols;
+        }
+        const fontSize = this.terminal.options.fontSize ?? 12;
+        return fontSize * 0.6;
+    }
+
     private getTouchScrollLineHeight(): number {
         const rowElem = this.connectElem.querySelector(".xterm-rows > div") as HTMLElement | null;
         if (rowElem?.offsetHeight) {
@@ -409,14 +726,28 @@ export class TermWrap {
         let lastY = 0;
         let accumulatedPx = 0;
         let mode: TouchMode = "none";
+        let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+        let longPressTriggered = false;
+        let selectionExtendAnchor: { x: number; y: number } | null = null;
+
+        const clearLongPressTimer = () => {
+            if (longPressTimer != null) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        };
 
         const resetTouch = () => {
+            clearLongPressTimer();
             activeTouchId = null;
             startX = 0;
             startY = 0;
             lastY = 0;
             accumulatedPx = 0;
             mode = "none";
+            longPressTriggered = false;
+            selectionExtendAnchor = null;
+            this.touchSelectGestureActive = false;
             this.connectElem.classList.remove("term-touchscroll-enabled");
             this.connectElem.classList.remove("term-touchselect-active");
         };
@@ -433,37 +764,43 @@ export class TermWrap {
             return null;
         };
 
-        const commitGestureMode = (touch: Touch): TouchMode => {
-            const dx = Math.abs(touch.clientX - startX);
-            const dy = Math.abs(touch.clientY - startY);
-            const scrollEnabled = this.isTouchScrollEnabled();
-            const selectEnabled = this.isTouchTextSelectEnabled();
+        const beginLongPressTimer = () => {
+            if (!this.isTouchTextSelectEnabled()) {
+                return;
+            }
+            clearLongPressTimer();
+            longPressTimer = setTimeout(() => {
+                longPressTimer = null;
+                if (activeTouchId == null || mode !== "none") {
+                    return;
+                }
+                longPressTriggered = true;
+                if (!this.selectWordAtClient(startX, startY)) {
+                    return;
+                }
+                mode = "select";
+                this.touchSelectGestureActive = true;
+                this.connectElem.classList.add("term-touchselect-active");
+                this.terminal.focus();
+                const selectionPos = this.terminal.getSelectionPosition();
+                const touchCell = this.clientToBufferCell(startX, startY);
+                if (selectionPos != null && touchCell != null) {
+                    selectionExtendAnchor = this.getSelectionExtendAnchor(touchCell, selectionPos);
+                }
+                if (typeof navigator.vibrate === "function") {
+                    navigator.vibrate(10);
+                }
+            }, TouchLongPressMs);
+        };
 
-            if (selectEnabled && dx >= dy) {
-                mode = "select";
-                this.connectElem.classList.add("term-touchselect-active");
-                this.terminal.focus();
-                this.dispatchTerminalMouseEvent("mousedown", startX, startY);
-                return mode;
+        const commitScrollMode = () => {
+            if (!this.isTouchScrollEnabled() || mode !== "none") {
+                return false;
             }
-            if (scrollEnabled && dy > dx * TouchScrollDominanceRatio) {
-                mode = "scroll";
-                this.connectElem.classList.add("term-touchscroll-enabled");
-                return mode;
-            }
-            if (selectEnabled) {
-                mode = "select";
-                this.connectElem.classList.add("term-touchselect-active");
-                this.terminal.focus();
-                this.dispatchTerminalMouseEvent("mousedown", startX, startY);
-                return mode;
-            }
-            if (scrollEnabled) {
-                mode = "scroll";
-                this.connectElem.classList.add("term-touchscroll-enabled");
-                return mode;
-            }
-            return "none";
+            mode = "scroll";
+            clearLongPressTimer();
+            this.connectElem.classList.add("term-touchscroll-enabled");
+            return true;
         };
 
         const onTouchStart = (e: TouchEvent) => {
@@ -479,7 +816,11 @@ export class TermWrap {
             lastY = touch.clientY;
             accumulatedPx = 0;
             mode = "none";
-            if (scrollEnabled && !selectEnabled) {
+            longPressTriggered = false;
+            selectionExtendAnchor = null;
+            if (selectEnabled && !this.terminal.hasSelection()) {
+                beginLongPressTimer();
+            } else if (scrollEnabled) {
                 this.connectElem.classList.add("term-touchscroll-enabled");
             }
         };
@@ -497,20 +838,27 @@ export class TermWrap {
                 return;
             }
 
-            if (mode === "none") {
+            if (mode === "none" && !longPressTriggered) {
                 const dx = Math.abs(touch.clientX - startX);
                 const dy = Math.abs(touch.clientY - startY);
-                if (Math.max(dx, dy) < TouchGestureCommitThresholdPx) {
-                    return;
-                }
-                if (commitGestureMode(touch) === "none") {
-                    return;
+                const dist = Math.max(dx, dy);
+                if (dist >= TouchLongPressMoveTolerancePx) {
+                    clearLongPressTimer();
+                    if (
+                        this.isTouchScrollEnabled() &&
+                        dy >= TouchGestureCommitThresholdPx &&
+                        dy > dx * TouchScrollDominanceRatio
+                    ) {
+                        commitScrollMode();
+                    }
                 }
             }
 
             if (mode === "select") {
                 e.preventDefault();
-                this.dispatchTerminalMouseEvent("mousemove", touch.clientX, touch.clientY);
+                if (selectionExtendAnchor != null) {
+                    this.extendTouchSelection(selectionExtendAnchor, touch.clientX, touch.clientY);
+                }
                 return;
             }
 
@@ -524,6 +872,9 @@ export class TermWrap {
                 if (lines !== 0) {
                     this.terminal.scrollLines(lines);
                     accumulatedPx -= lines * lineHeight;
+                    if (this.terminal.hasSelection()) {
+                        this.notifySelectionHandlesUpdate();
+                    }
                 }
             }
         };
@@ -536,10 +887,18 @@ export class TermWrap {
             if (touch == null) {
                 return;
             }
-            if (mode === "select") {
-                this.dispatchTerminalMouseEvent("mouseup", touch.clientX, touch.clientY);
-            }
+            const endedMode = mode;
+            const wasLongPress = longPressTriggered;
             resetTouch();
+            if (endedMode === "select" || wasLongPress) {
+                this.notifySelectionHandlesUpdate();
+            }
+        };
+
+        const onContextMenu = (e: Event) => {
+            if (longPressTriggered || mode === "select") {
+                e.preventDefault();
+            }
         };
 
         const touchOpts: AddEventListenerOptions = { passive: false };
@@ -550,9 +909,11 @@ export class TermWrap {
         this.connectElem.addEventListener("touchmove", onTouchMove, touchOpts);
         this.connectElem.addEventListener("touchend", onTouchEnd);
         this.connectElem.addEventListener("touchcancel", onTouchEnd);
+        this.connectElem.addEventListener("contextmenu", onContextMenu);
 
         return {
             dispose: () => {
+                clearLongPressTimer();
                 this.connectElem.classList.remove("term-touchscroll-enabled");
                 this.connectElem.classList.remove("term-touchselect-active");
                 this.connectElem.classList.remove("term-touchtextselect-enabled");
@@ -561,6 +922,7 @@ export class TermWrap {
                 this.connectElem.removeEventListener("touchmove", onTouchMove);
                 this.connectElem.removeEventListener("touchend", onTouchEnd);
                 this.connectElem.removeEventListener("touchcancel", onTouchEnd);
+                this.connectElem.removeEventListener("contextmenu", onContextMenu);
             },
         };
     }

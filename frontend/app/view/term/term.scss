@@ -54,12 +54,21 @@
         }
     }
 
+    .term-connectelem-wrap {
+        flex-grow: 1;
+        min-height: 0;
+        position: relative;
+        display: flex;
+        overflow: hidden;
+        margin: 5px 1px 5px 4px;
+    }
+
     .term-connectelem {
         flex-grow: 1;
         min-height: 0;
         overflow: hidden;
         line-height: 1;
-        margin: 5px 1px 5px 4px;
+        width: 100%;
 
         &.term-touchscroll-enabled {
             touch-action: none;
@@ -73,7 +82,8 @@
         &.term-touchtextselect-enabled {
             .terminal,
             .xterm {
-                touch-action: auto;
+                touch-action: pan-y;
+                -webkit-touch-callout: none;
             }
         }
 
@@ -108,6 +118,9 @@
     }
 
     &.term-mode-term {
+        .term-connectelem-wrap {
+            display: flex;
+        }
         .term-connectelem {
             display: flex;
         }
@@ -117,6 +130,9 @@
     }
 
     &.term-mode-vdom {
+        .term-connectelem-wrap {
+            display: none;
+        }
         .term-connectelem {
             display: none;
         }

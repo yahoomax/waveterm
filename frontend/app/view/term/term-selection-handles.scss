@@ -1,0 +1,61 @@
+// Copyright 2026, Command Line Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+// Approximate Chromium/webview touch selection handles (system accent teardrop).
+$term-selection-handle-hit: 48px;
+
+.term-selection-handles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 30;
+    overflow: visible;
+}
+
+.term-selection-handle {
+    position: absolute;
+    pointer-events: auto;
+    touch-action: none;
+    width: $term-selection-handle-hit;
+    height: $term-selection-handle-hit;
+    color: var(--accent-color, #0078d4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.term-selection-handle-icon {
+    display: block;
+    overflow: visible;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 28%));
+    transition: transform 0.1s ease, filter 0.1s ease;
+}
+
+.term-selection-handle-start {
+    // Stem tip anchors at the selection start corner.
+    transform: translate(-38%, -92%);
+
+    .term-selection-handle-icon {
+        transform-origin: 50% 100%;
+    }
+
+    &.is-adjusting .term-selection-handle-icon {
+        transform: scale(1.12);
+        filter: drop-shadow(0 2px 4px rgb(0 0 0 / 35%));
+    }
+}
+
+.term-selection-handle-end {
+    // Stem tip anchors at the selection end corner.
+    transform: translate(-62%, -8%);
+
+    .term-selection-handle-icon {
+        transform: rotate(180deg);
+        transform-origin: 50% 50%;
+    }
+
+    &.is-adjusting .term-selection-handle-icon {
+        transform: rotate(180deg) scale(1.12);
+        filter: drop-shadow(0 2px 4px rgb(0 0 0 / 35%));
+    }
+}

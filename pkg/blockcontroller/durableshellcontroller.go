@@ -168,13 +168,6 @@ func (dsc *DurableShellController) Start(ctx context.Context, blockMeta waveobj.
 
 	if jobId == "" {
 		log.Printf("block %q starting new durable shell\n", dsc.BlockId)
-		psErr, connErr := prepareShellConnection(ctx, dsc.BlockId, dsc.ConnName)
-		if connErr != nil {
-			return fmt.Errorf("error ensuring connection %s: %w", dsc.ConnName, connErr)
-		}
-		if psErr != nil {
-			log.Printf("warning: prescript error for %s: %v", dsc.ConnName, psErr)
-		}
 		fsErr := filestore.WFS.MakeFile(ctx, dsc.BlockId, wavebase.BlockFile_Term, nil, wshrpc.FileOpts{MaxSize: DefaultTermMaxFileSize, Circular: true})
 		if fsErr != nil && fsErr != fs.ErrExist {
 			return fmt.Errorf("error creating block term file: %w", fsErr)
@@ -184,6 +177,14 @@ func (dsc *DurableShellController) Start(ctx context.Context, blockMeta waveobj.
 			return fmt.Errorf("failed to start new job: %w", err)
 		}
 		jobId = newJobId
+	}
+
+	psErr, connErr := prepareShellConnection(ctx, dsc.ConnName)
+	if connErr != nil {
+		return fmt.Errorf("error ensuring connection %s: %w", dsc.ConnName, connErr)
+	}
+	if psErr != nil {
+		log.Printf("warning: prescript error for %s: %v", dsc.ConnName, psErr)
 	}
 
 	dsc.WithLock(func() {

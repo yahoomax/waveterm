@@ -501,6 +501,12 @@ func onConnectionUp(connName string) {
 
 	log.Printf("[conn:%s] found %d jobs to reconnect", connName, len(jobsToReconnect))
 
+	if len(jobsToReconnect) > 0 {
+		if err := conncontroller.RunConnectionPreScriptForShell(ctx, connName); err != nil {
+			log.Printf("[conn:%s] warning: prescript error: %v", connName, err)
+		}
+	}
+
 	successCount := 0
 	for _, job := range jobsToReconnect {
 		err = ReconnectJob(ctx, job.OID, nil)

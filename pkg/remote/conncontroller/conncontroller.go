@@ -69,10 +69,30 @@ const (
 )
 
 const DefaultConnectionTimeout = 60 * time.Second
+const preScriptDedupeWindow = 15 * time.Second
 
 var globalLock = &sync.Mutex{}
 var clientControllerMap = make(map[remote.SSHOpts]*SSHConn)
 var activeConnCounter = &atomic.Int32{}
+
+var (
+	preScriptMu      sync.Mutex
+	preScriptLastRun = make(map[string]time.Time)
+)
+
+func shouldRunPreScriptForConn(connName string) bool {
+	if connName == "" {
+		return true
+	}
+	now := time.Now()
+	preScriptMu.Lock()
+	defer preScriptMu.Unlock()
+	if lastRun, ok := preScriptLastRun[connName]; ok && now.Sub(lastRun) < preScriptDedupeWindow {
+		return false
+	}
+	preScriptLastRun[connName] = now
+	return true
+}
 
 type SSHConn struct {
 	lock          *sync.Mutex // this lock protects the fields in the struct from concurrent access
@@ -1175,9 +1195,13 @@ func EnsureConnection(ctx context.Context, connName string) error {
 	}
 }
 
-// RunConnectionPreScriptForShell runs conn:prescript for shell starts, including already-connected SSH connections.
+// RunConnectionPreScriptForShell runs conn:prescript for shell starts and reconnects, including
+// already-connected SSH connections. Deduped per connection to avoid double-opens on resync.
 func RunConnectionPreScriptForShell(ctx context.Context, connName string) error {
-	if IsLocalConnName(connName) {
+	if IsLocalConnName(connName) || IsWslConnName(connName) {
+		return nil
+	}
+	if !shouldRunPreScriptForConn(connName) {
 		return nil
 	}
 	connOpts, err := remote.ParseOpts(connName)

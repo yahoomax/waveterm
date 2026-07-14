@@ -73,7 +73,14 @@
         &.term-touchtextselect-enabled {
             .terminal,
             .xterm {
-                touch-action: manipulation;
+                touch-action: auto;
+            }
+        }
+
+        &.term-touchselect-active {
+            .terminal,
+            .xterm {
+                touch-action: none;
             }
         }
 

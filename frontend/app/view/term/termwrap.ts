@@ -52,7 +52,8 @@ const TermCacheFileName = "cache:term:full";
 const MinDataProcessedForCache = 100 * 1024;
 export const SupportsImageInput = true;
 const MaxRepaintTransactionMs = 2000;
-const TouchScrollCommitThresholdPx = 10;
+const TouchGestureCommitThresholdPx = 10;
+const TouchScrollDominanceRatio = 1.5;
 
 // detect webgl support
 function detectWebGLSupport(): boolean {
@@ -350,8 +351,7 @@ export class TermWrap {
                 this.connectElem.removeEventListener("mousedown", middleClickPasteHandler, true);
             },
         });
-        this.toDispose.push(this.attachTouchScrollHandler());
-        this.toDispose.push(this.attachTouchTextSelectHandler());
+        this.toDispose.push(this.attachTouchInteractionHandler());
     }
 
     private isTouchScrollEnabled(): boolean {
@@ -362,24 +362,32 @@ export class TermWrap {
         return globalStore.get(getOverrideConfigAtom(this.blockId, "term:touchtextselect")) !== false;
     }
 
-    private shouldLockTouchActionForScroll(): boolean {
-        return this.isTouchScrollEnabled() && !this.isTouchTextSelectEnabled();
-    }
-
     private updateTouchTextSelectClass(): void {
         const enabled = this.isTouchTextSelectEnabled();
         this.connectElem.classList.toggle("term-touchtextselect-enabled", enabled);
         this.connectElem.classList.toggle("term-touchtextselect-disabled", !enabled);
     }
 
-    private attachTouchTextSelectHandler(): TermTypes.IDisposable {
-        this.updateTouchTextSelectClass();
-        return {
-            dispose: () => {
-                this.connectElem.classList.remove("term-touchtextselect-enabled");
-                this.connectElem.classList.remove("term-touchtextselect-disabled");
-            },
-        };
+    private dispatchTerminalMouseEvent(
+        type: "mousedown" | "mousemove" | "mouseup",
+        clientX: number,
+        clientY: number
+    ): void {
+        const termElem = this.terminal.element;
+        if (termElem == null) {
+            return;
+        }
+        termElem.dispatchEvent(
+            new MouseEvent(type, {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX,
+                clientY,
+                button: 0,
+                buttons: type === "mouseup" ? 0 : 1,
+            })
+        );
     }
 
     private getTouchScrollLineHeight(): number {
@@ -391,68 +399,132 @@ export class TermWrap {
         return fontSize * 1.35;
     }
 
-    private attachTouchScrollHandler(): TermTypes.IDisposable {
+    private attachTouchInteractionHandler(): TermTypes.IDisposable {
+        this.updateTouchTextSelectClass();
+
+        type TouchMode = "none" | "scroll" | "select";
         let activeTouchId: number | null = null;
-        let lastY: number | null = null;
-        let startY: number | null = null;
+        let startX = 0;
+        let startY = 0;
+        let lastY = 0;
         let accumulatedPx = 0;
-        let scrollCommitted = false;
+        let mode: TouchMode = "none";
 
         const resetTouch = () => {
             activeTouchId = null;
-            lastY = null;
-            startY = null;
+            startX = 0;
+            startY = 0;
+            lastY = 0;
             accumulatedPx = 0;
-            scrollCommitted = false;
-            if (this.isTouchTextSelectEnabled()) {
-                this.connectElem.classList.remove("term-touchscroll-enabled");
+            mode = "none";
+            this.connectElem.classList.remove("term-touchscroll-enabled");
+            this.connectElem.classList.remove("term-touchselect-active");
+        };
+
+        const findActiveTouch = (touches: TouchList): Touch | null => {
+            if (activeTouchId == null) {
+                return null;
             }
+            for (const touch of Array.from(touches)) {
+                if (touch.identifier === activeTouchId) {
+                    return touch;
+                }
+            }
+            return null;
+        };
+
+        const commitGestureMode = (touch: Touch): TouchMode => {
+            const dx = Math.abs(touch.clientX - startX);
+            const dy = Math.abs(touch.clientY - startY);
+            const scrollEnabled = this.isTouchScrollEnabled();
+            const selectEnabled = this.isTouchTextSelectEnabled();
+
+            if (selectEnabled && dx >= dy) {
+                mode = "select";
+                this.connectElem.classList.add("term-touchselect-active");
+                this.terminal.focus();
+                this.dispatchTerminalMouseEvent("mousedown", startX, startY);
+                return mode;
+            }
+            if (scrollEnabled && dy > dx * TouchScrollDominanceRatio) {
+                mode = "scroll";
+                this.connectElem.classList.add("term-touchscroll-enabled");
+                return mode;
+            }
+            if (selectEnabled) {
+                mode = "select";
+                this.connectElem.classList.add("term-touchselect-active");
+                this.terminal.focus();
+                this.dispatchTerminalMouseEvent("mousedown", startX, startY);
+                return mode;
+            }
+            if (scrollEnabled) {
+                mode = "scroll";
+                this.connectElem.classList.add("term-touchscroll-enabled");
+                return mode;
+            }
+            return "none";
         };
 
         const onTouchStart = (e: TouchEvent) => {
-            if (!this.isTouchScrollEnabled() || e.touches.length !== 1) {
+            const scrollEnabled = this.isTouchScrollEnabled();
+            const selectEnabled = this.isTouchTextSelectEnabled();
+            if ((!scrollEnabled && !selectEnabled) || e.touches.length !== 1) {
                 return;
             }
             const touch = e.touches[0];
             activeTouchId = touch.identifier;
-            lastY = touch.clientY;
+            startX = touch.clientX;
             startY = touch.clientY;
+            lastY = touch.clientY;
             accumulatedPx = 0;
-            scrollCommitted = this.shouldLockTouchActionForScroll();
-            if (scrollCommitted) {
+            mode = "none";
+            if (scrollEnabled && !selectEnabled) {
                 this.connectElem.classList.add("term-touchscroll-enabled");
             }
         };
 
         const onTouchMove = (e: TouchEvent) => {
-            if (!this.isTouchScrollEnabled() || activeTouchId == null) {
+            if (activeTouchId == null) {
                 return;
             }
             if (e.touches.length !== 1) {
                 resetTouch();
                 return;
             }
-            const touch = e.touches[0];
-            if (touch.identifier !== activeTouchId) {
+            const touch = findActiveTouch(e.touches);
+            if (touch == null) {
                 return;
             }
-            if (!scrollCommitted && this.isTouchTextSelectEnabled() && startY != null) {
-                const totalMove = Math.abs(touch.clientY - startY);
-                if (totalMove < TouchScrollCommitThresholdPx) {
+
+            if (mode === "none") {
+                const dx = Math.abs(touch.clientX - startX);
+                const dy = Math.abs(touch.clientY - startY);
+                if (Math.max(dx, dy) < TouchGestureCommitThresholdPx) {
                     return;
                 }
-                scrollCommitted = true;
-                this.connectElem.classList.add("term-touchscroll-enabled");
+                if (commitGestureMode(touch) === "none") {
+                    return;
+                }
             }
-            e.preventDefault();
-            const deltaY = lastY! - touch.clientY;
-            lastY = touch.clientY;
-            accumulatedPx += deltaY;
-            const lineHeight = this.getTouchScrollLineHeight();
-            const lines = Math.trunc(accumulatedPx / lineHeight);
-            if (lines !== 0) {
-                this.terminal.scrollLines(lines);
-                accumulatedPx -= lines * lineHeight;
+
+            if (mode === "select") {
+                e.preventDefault();
+                this.dispatchTerminalMouseEvent("mousemove", touch.clientX, touch.clientY);
+                return;
+            }
+
+            if (mode === "scroll" && this.isTouchScrollEnabled()) {
+                e.preventDefault();
+                const deltaY = lastY - touch.clientY;
+                lastY = touch.clientY;
+                accumulatedPx += deltaY;
+                const lineHeight = this.getTouchScrollLineHeight();
+                const lines = Math.trunc(accumulatedPx / lineHeight);
+                if (lines !== 0) {
+                    this.terminal.scrollLines(lines);
+                    accumulatedPx -= lines * lineHeight;
+                }
             }
         };
 
@@ -460,14 +532,18 @@ export class TermWrap {
             if (activeTouchId == null) {
                 return;
             }
-            const ended = Array.from(e.changedTouches).some((t) => t.identifier === activeTouchId);
-            if (ended) {
-                resetTouch();
+            const touch = Array.from(e.changedTouches).find((t) => t.identifier === activeTouchId);
+            if (touch == null) {
+                return;
             }
+            if (mode === "select") {
+                this.dispatchTerminalMouseEvent("mouseup", touch.clientX, touch.clientY);
+            }
+            resetTouch();
         };
 
         const touchOpts: AddEventListenerOptions = { passive: false };
-        if (this.shouldLockTouchActionForScroll()) {
+        if (this.isTouchScrollEnabled() && !this.isTouchTextSelectEnabled()) {
             this.connectElem.classList.add("term-touchscroll-enabled");
         }
         this.connectElem.addEventListener("touchstart", onTouchStart, touchOpts);
@@ -478,6 +554,9 @@ export class TermWrap {
         return {
             dispose: () => {
                 this.connectElem.classList.remove("term-touchscroll-enabled");
+                this.connectElem.classList.remove("term-touchselect-active");
+                this.connectElem.classList.remove("term-touchtextselect-enabled");
+                this.connectElem.classList.remove("term-touchtextselect-disabled");
                 this.connectElem.removeEventListener("touchstart", onTouchStart);
                 this.connectElem.removeEventListener("touchmove", onTouchMove);
                 this.connectElem.removeEventListener("touchend", onTouchEnd);

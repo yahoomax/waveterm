@@ -71,6 +71,8 @@ const (
 	ConfigKey_EditorWordWrap                 = "editor:wordwrap"
 	ConfigKey_EditorFontSize                 = "editor:fontsize"
 	ConfigKey_EditorInlineDiff               = "editor:inlinediff"
+	ConfigKey_EditorTouchTextSelect          = "editor:touchtextselect"
+	ConfigKey_EditorCopyOnSelect             = "editor:copyonselect"
 
 	ConfigKey_WebClear                       = "web:*"
 	ConfigKey_WebOpenLinksInternally         = "web:openlinksinternally"

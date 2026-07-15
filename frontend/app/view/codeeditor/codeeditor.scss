@@ -1,0 +1,29 @@
+// Copyright 2026, Command Line Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+.codeeditor-wrap {
+    position: relative;
+
+    &.editor-touchtextselect-enabled {
+        touch-action: pan-y;
+        -webkit-touch-callout: none;
+
+        .monaco-editor.editor-touchselect-active {
+            touch-action: none;
+        }
+    }
+
+    &.editor-touchtextselect-disabled {
+        touch-action: pan-y;
+        -webkit-touch-callout: none;
+        user-select: none;
+        -webkit-user-select: none;
+
+        .monaco-editor,
+        .monaco-editor .view-lines,
+        .monaco-editor .view-line {
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+    }
+}

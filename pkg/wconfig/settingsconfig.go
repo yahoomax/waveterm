@@ -122,6 +122,8 @@ type SettingsType struct {
 	EditorWordWrap            bool    `json:"editor:wordwrap,omitempty"`
 	EditorFontSize            float64 `json:"editor:fontsize,omitempty"`
 	EditorInlineDiff          bool    `json:"editor:inlinediff,omitempty"`
+	EditorTouchTextSelect     *bool   `json:"editor:touchtextselect,omitempty"`
+	EditorCopyOnSelect        *bool   `json:"editor:copyonselect,omitempty"`
 
 	WebClear               bool   `json:"web:*,omitempty"`
 	WebOpenLinksInternally bool   `json:"web:openlinksinternally,omitempty"`

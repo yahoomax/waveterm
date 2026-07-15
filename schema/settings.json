@@ -201,6 +201,9 @@
         "editor:inlinediff": {
           "type": "boolean"
         },
+        "editor:touchtextselect": {
+          "type": "boolean"
+        },
         "web:*": {
           "type": "boolean"
         },

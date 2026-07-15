@@ -8,6 +8,7 @@ import clsx from "clsx";
 import type * as MonacoTypes from "monaco-editor";
 import * as MonacoModule from "monaco-editor";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { attachEditorCopyOnSelect } from "./editor-copyonselect";
 import { EditorSelectionHandles } from "./editor-selection-handles";
 import { EditorTouchSelectController } from "./editor-touchselect-controller";
 import "./codeeditor.scss";
@@ -97,6 +98,7 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
         monaco: typeof MonacoModule
     ): () => void {
         editorRef.current = editor;
+        const copyOnSelectDispose = attachEditorCopyOnSelect(editor, blockId);
         if (touchTextSelectEnabled) {
             touchSelectController.attach(editor);
             setHandlesController(touchSelectController);
@@ -108,6 +110,7 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
             const cleanup = onMount(editor, monaco);
             unmountRef.current = cleanup;
             return () => {
+                copyOnSelectDispose.dispose();
                 touchSelectController.detach();
                 setHandlesController(null);
                 editorRef.current = null;
@@ -115,6 +118,7 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
             };
         }
         return () => {
+            copyOnSelectDispose.dispose();
             touchSelectController.detach();
             setHandlesController(null);
             editorRef.current = null;

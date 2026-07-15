@@ -85,6 +85,7 @@ wsh editconfig
 | editor:wordwrap                      | bool     | set to true to enable word wrapping in the editor (defaults to false)                                                                                                                                                                                         |
 | editor:fontsize                      | float64  | set the font size for the editor (defaults to 12px)                                                                                                                                                                                                           |
 | editor:touchtextselect               | bool     | set to false to disable touch screen text selection in the code editor (defaults to true). When enabled, drag horizontally to select text; selection handles appear at the start and end for adjusting the range. Vertical swipes still scroll. Long-press continues to open the editor context menu |
+| editor:copyonselect                  | bool     | set to false to disable editor copy-on-select (defaults to true)                                                                                                                                                                                              |
 | editor:inlinediff                    | bool     | set to true to show diffs inline instead of side-by-side, false for side-by-side (defaults to undefined which uses Monaco's responsive behavior)                                                                                                              |
 | preview:showhiddenfiles              | bool     | set to false to disable showing hidden files in the directory preview (defaults to true)                                                                                                                                                                      |
 | preview:defaultsort <VersionBadge version="v0.14.2" />                 | string   | sets the default sort column for directory preview. `"name"` (default) sorts alphabetically by name ascending; `"modtime"` sorts by last modified time descending (newest first)                                                                               |
@@ -142,6 +143,7 @@ For reference, this is the current default configuration (v0.14.0):
     "conn:wshenabled": true,
     "editor:minimapenabled": true,
     "editor:touchtextselect": true,
+    "editor:copyonselect": true,
     "web:defaulturl": "https://github.com/wavetermdev/waveterm",
     "web:defaultsearch": "https://www.google.com/search?q={query}",
     "window:tilegapsize": 3,

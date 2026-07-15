@@ -204,6 +204,9 @@
         "editor:touchtextselect": {
           "type": "boolean"
         },
+        "editor:copyonselect": {
+          "type": "boolean"
+        },
         "web:*": {
           "type": "boolean"
         },

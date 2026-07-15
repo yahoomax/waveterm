@@ -448,19 +448,26 @@ export class TermWrap {
                 (selectionPos.start.y === selectionPos.end.y && selectionPos.start.x <= selectionPos.end.x);
             if (forward) {
                 return {
-                    start: { left: firstRect.left - connectRect.left, top: firstRect.top - connectRect.top },
+                    start: {
+                        left: firstRect.left - connectRect.left,
+                        top: firstRect.bottom - connectRect.top,
+                    },
                     end: { left: lastRect.right - connectRect.left, top: lastRect.bottom - connectRect.top },
                 };
             }
             return {
                 start: { left: lastRect.right - connectRect.left, top: lastRect.bottom - connectRect.top },
-                end: { left: firstRect.left - connectRect.left, top: firstRect.top - connectRect.top },
+                end: { left: firstRect.left - connectRect.left, top: firstRect.bottom - connectRect.top },
             };
         }
-        const startClient = this.bufferCellToClientOffset(selectionPos.start, false);
+        const startLeft = this.bufferCellToClientOffset(selectionPos.start, false);
+        const startBottom = this.bufferCellToClientOffset(selectionPos.start, true);
         const endClient = this.bufferCellToClientOffset(selectionPos.end, true);
         return {
-            start: { left: startClient.x - connectRect.left, top: startClient.y - connectRect.top },
+            start: {
+                left: startLeft.x - connectRect.left,
+                top: startBottom.y - connectRect.top,
+            },
             end: { left: endClient.x - connectRect.left, top: endClient.y - connectRect.top },
         };
     }

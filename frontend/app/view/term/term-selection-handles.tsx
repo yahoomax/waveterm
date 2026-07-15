@@ -10,6 +10,18 @@ import "./term-selection-handles.scss";
 type HandlePoint = { left: number; top: number };
 type HandlePositions = { start: HandlePoint; end: HandlePoint };
 
+// Stem tip to knob-center distance in the teardrop SVG (viewBox 24x28, knob ~y=7, tip y=28).
+const HANDLE_KNOB_OFFSET_FROM_TIP_PX = 29;
+const HANDLE_ICON_WIDTH_PX = 32;
+const HANDLE_ICON_HEIGHT_PX = 38;
+
+function tipToKnobPositions(tips: HandlePositions): HandlePositions {
+    return {
+        start: { left: tips.start.left, top: tips.start.top + HANDLE_KNOB_OFFSET_FROM_TIP_PX },
+        end: { left: tips.end.left, top: tips.end.top + HANDLE_KNOB_OFFSET_FROM_TIP_PX },
+    };
+}
+
 interface TermSelectionHandlesProps {
     termWrap: TermWrap | null;
     blockId: string;
@@ -24,8 +36,8 @@ function SelectionHandleIcon({ variant }: { variant: "start" | "end" }) {
         <svg
             className={`term-selection-handle-icon term-selection-handle-icon-${variant}`}
             viewBox="0 0 24 28"
-            width="24"
-            height="28"
+            width={HANDLE_ICON_WIDTH_PX}
+            height={HANDLE_ICON_HEIGHT_PX}
             aria-hidden="true"
         >
             <path d={HANDLE_PATH} fill="currentColor" />
@@ -52,7 +64,23 @@ export const TermSelectionHandles = React.memo(function TermSelectionHandles({
             setPositions(null);
             return;
         }
-        setPositions(termWrap.getSelectionHandlePositions());
+        const tips = termWrap.getSelectionHandlePositions();
+        if (tips == null) {
+            setPositions(null);
+            return;
+        }
+        const connectRect = termWrap.connectElem.getBoundingClientRect();
+        const knobs = tipToKnobPositions(tips);
+        setPositions({
+            start: {
+                left: connectRect.left + knobs.start.left,
+                top: connectRect.top + knobs.start.top,
+            },
+            end: {
+                left: connectRect.left + knobs.end.left,
+                top: connectRect.top + knobs.end.top,
+            },
+        });
     }, [termWrap, touchSelectEnabled]);
 
     const scheduleUpdate = React.useCallback(() => {
@@ -98,6 +126,7 @@ export const TermSelectionHandles = React.memo(function TermSelectionHandles({
         if (termWrap.connectElem) {
             resizeObserver.observe(termWrap.connectElem);
         }
+        window.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
 
         return () => {
             selectionDispose.dispose();
@@ -107,6 +136,7 @@ export const TermSelectionHandles = React.memo(function TermSelectionHandles({
             viewport?.removeEventListener("scroll", scheduleUpdate);
             selectionObserver?.disconnect();
             resizeObserver.disconnect();
+            window.removeEventListener("scroll", scheduleUpdate, { capture: true });
             if (rafRef.current != null) {
                 cancelAnimationFrame(rafRef.current);
                 rafRef.current = null;
@@ -154,28 +184,50 @@ export const TermSelectionHandles = React.memo(function TermSelectionHandles({
 
     const attachDocumentDrag = React.useCallback(
         (handle: "start" | "end", startX: number, startY: number) => {
-            startAdjust(handle, startX, startY);
+            if (!termWrap) {
+                return;
+            }
+            const tips = termWrap.getSelectionHandlePositions();
+            if (tips == null) {
+                return;
+            }
+            const connectRect = termWrap.connectElem.getBoundingClientRect();
+            const tip = handle === "start" ? tips.start : tips.end;
+            const tipClientX = connectRect.left + tip.left;
+            const tipClientY = connectRect.top + tip.top;
+            const fingerToTipOffsetX = startX - tipClientX;
+            const fingerToTipOffsetY = startY - tipClientY;
+            const toTipCoords = (clientX: number, clientY: number) => ({
+                x: clientX - fingerToTipOffsetX,
+                y: clientY - fingerToTipOffsetY,
+            });
+            const startTip = toTipCoords(startX, startY);
+            startAdjust(handle, startTip.x, startTip.y);
 
             const onTouchMove = (e: TouchEvent) => {
                 if (e.touches.length !== 1) {
                     return;
                 }
                 e.preventDefault();
-                moveAdjust(e.touches[0].clientX, e.touches[0].clientY);
+                const tipCoords = toTipCoords(e.touches[0].clientX, e.touches[0].clientY);
+                moveAdjust(tipCoords.x, tipCoords.y);
             };
             const onTouchEnd = (e: TouchEvent) => {
                 const touch = e.changedTouches[0];
                 if (touch != null) {
-                    endAdjust(touch.clientX, touch.clientY);
+                    const tipCoords = toTipCoords(touch.clientX, touch.clientY);
+                    endAdjust(tipCoords.x, tipCoords.y);
                 }
                 cleanup();
             };
             const onMouseMove = (e: MouseEvent) => {
                 e.preventDefault();
-                moveAdjust(e.clientX, e.clientY);
+                const tipCoords = toTipCoords(e.clientX, e.clientY);
+                moveAdjust(tipCoords.x, tipCoords.y);
             };
             const onMouseUp = (e: MouseEvent) => {
-                endAdjust(e.clientX, e.clientY);
+                const tipCoords = toTipCoords(e.clientX, e.clientY);
+                endAdjust(tipCoords.x, tipCoords.y);
                 cleanup();
             };
             const cleanup = () => {
@@ -192,7 +244,7 @@ export const TermSelectionHandles = React.memo(function TermSelectionHandles({
             window.addEventListener("mousemove", onMouseMove);
             window.addEventListener("mouseup", onMouseUp);
         },
-        [startAdjust, moveAdjust, endAdjust]
+        [startAdjust, moveAdjust, endAdjust, termWrap]
     );
 
     const bindHandleEvents = (handle: "start" | "end") => ({

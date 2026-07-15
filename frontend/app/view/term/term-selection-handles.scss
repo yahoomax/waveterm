@@ -1,41 +1,68 @@
 // Copyright 2026, Command Line Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Touch target is centered on the visible knob; the SVG stem tip points at the selection.
-$term-selection-handle-hit: 72px;
+// Teardrop handles: tip on the bottom edge of the selection, bulb hangs down and inward.
+$term-selection-handle-hit: 52px;
+$term-selection-handle-width: 32px;
+$term-selection-handle-height: 38px;
+$term-selection-handle-half-width: $term-selection-handle-width * 0.5;
 
 .term-selection-handles {
     display: contents;
 }
 
 .term-selection-handle {
-    position: fixed;
+    position: absolute;
     pointer-events: auto;
     touch-action: none;
     width: $term-selection-handle-hit;
     height: $term-selection-handle-hit;
     color: var(--accent-color, #0078d4);
     z-index: 1000;
-    // left/top are the knob center in viewport coordinates.
-    transform: translate(-50%, -50%);
 }
 
 .term-selection-handle-icon {
     position: absolute;
-    left: 50%;
-    top: 50%;
     display: block;
     overflow: visible;
     pointer-events: none;
-    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 28%));
+    width: $term-selection-handle-width;
+    height: $term-selection-handle-height;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 22%));
     transition: transform 0.1s ease, filter 0.1s ease;
-    // Anchor transform at the knob center (viewBox 24x28 → knob ~y=7), then flip so stem points up.
-    transform: translate(-50%, -50%) scaleY(-1);
-    transform-origin: 50% 25%;
+    // Default path tip is at bottom-center of the viewBox.
+    left: -$term-selection-handle-half-width;
+    top: -$term-selection-handle-height;
+    transform-origin: $term-selection-handle-half-width $term-selection-handle-height;
+}
+
+// Start: tip at bottom-left of selection, bulb extends down-right.
+.term-selection-handle-start {
+    transform: none;
+
+    .term-selection-handle-icon {
+        transform: rotate(135deg);
+    }
+
+    &.is-adjusting .term-selection-handle-icon {
+        transform: rotate(135deg) scale(1.1);
+    }
+}
+
+// End: tip at bottom-right of selection, bulb extends down-left.
+.term-selection-handle-end {
+    transform: translate(-100%, 0);
+
+    .term-selection-handle-icon {
+        left: calc(100% - #{$term-selection-handle-half-width});
+        transform: scaleX(-1) rotate(135deg);
+    }
+
+    &.is-adjusting .term-selection-handle-icon {
+        transform: scaleX(-1) rotate(135deg) scale(1.1);
+    }
 }
 
 .term-selection-handle.is-adjusting .term-selection-handle-icon {
-    transform: translate(-50%, -50%) scale(1.12, -1.12);
-    transform-origin: 50% 25%;
-    filter: drop-shadow(0 2px 4px rgb(0 0 0 / 35%));
+    filter: drop-shadow(0 2px 4px rgb(0 0 0 / 32%));
 }

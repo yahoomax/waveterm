@@ -8,26 +8,12 @@ import type { TermWrap } from "./termwrap";
 import "./term-selection-handles.scss";
 
 type HandlePoint = { left: number; top: number };
-type HandlePositions = { start: HandlePoint; end: HandlePoint };
+type HandleRenderPositions = { start: HandlePoint; end: HandlePoint };
 
-// Stem tip to knob-center distance in the teardrop SVG (viewBox 24x28, knob ~y=7, tip y=28).
-const HANDLE_KNOB_OFFSET_FROM_TIP_PX = 29;
 const HANDLE_ICON_WIDTH_PX = 32;
 const HANDLE_ICON_HEIGHT_PX = 38;
 
-function tipToKnobPositions(tips: HandlePositions): HandlePositions {
-    return {
-        start: { left: tips.start.left, top: tips.start.top + HANDLE_KNOB_OFFSET_FROM_TIP_PX },
-        end: { left: tips.end.left, top: tips.end.top + HANDLE_KNOB_OFFSET_FROM_TIP_PX },
-    };
-}
-
-interface TermSelectionHandlesProps {
-    termWrap: TermWrap | null;
-    blockId: string;
-}
-
-// Chromium-style teardrop; tip is at the bottom center of the viewBox.
+// Teardrop with tip at the bottom center of the viewBox.
 const HANDLE_PATH =
     "M12 1.5C6.75 1.5 2.5 5.75 2.5 11c0 3.9 6.8 12.4 8.8 14.8.45.55 1.25.55 1.7 0C15.5 23.4 21.5 14.9 21.5 11 21.5 5.75 17.25 1.5 12 1.5z";
 
@@ -45,12 +31,17 @@ function SelectionHandleIcon({ variant }: { variant: "start" | "end" }) {
     );
 }
 
+interface TermSelectionHandlesProps {
+    termWrap: TermWrap | null;
+    blockId: string;
+}
+
 export const TermSelectionHandles = React.memo(function TermSelectionHandles({
     termWrap,
     blockId,
 }: TermSelectionHandlesProps) {
     const touchSelectEnabled = useAtomValueSafe(getOverrideConfigAtom(blockId, "term:touchtextselect")) !== false;
-    const [positions, setPositions] = React.useState<HandlePositions | null>(null);
+    const [positions, setPositions] = React.useState<HandleRenderPositions | null>(null);
     const [adjustingHandle, setAdjustingHandle] = React.useState<"start" | "end" | null>(null);
     const adjustingHandleRef = React.useRef<"start" | "end" | null>(null);
     const rafRef = React.useRef<number | null>(null);
@@ -70,15 +61,16 @@ export const TermSelectionHandles = React.memo(function TermSelectionHandles({
             return;
         }
         const connectRect = termWrap.connectElem.getBoundingClientRect();
-        const knobs = tipToKnobPositions(tips);
+        const offsetParent = termWrap.connectElem.parentElement;
+        const offsetRect = offsetParent?.getBoundingClientRect() ?? connectRect;
         setPositions({
             start: {
-                left: connectRect.left + knobs.start.left,
-                top: connectRect.top + knobs.start.top,
+                left: connectRect.left + tips.start.left - offsetRect.left,
+                top: connectRect.top + tips.start.top - offsetRect.top,
             },
             end: {
-                left: connectRect.left + knobs.end.left,
-                top: connectRect.top + knobs.end.top,
+                left: connectRect.left + tips.end.left - offsetRect.left,
+                top: connectRect.top + tips.end.top - offsetRect.top,
             },
         });
     }, [termWrap, touchSelectEnabled]);

@@ -422,6 +422,95 @@ export class TermWrap {
         });
     }
 
+    private getRenderCellDimensions(): { width: number; height: number } | null {
+        type XtermCore = {
+            _core?: {
+                _renderService?: {
+                    dimensions?: { css: { cell: { width: number; height: number } } };
+                };
+            };
+        };
+        const cell = (this.terminal as unknown as XtermCore)._core?._renderService?.dimensions?.css?.cell;
+        if (cell == null || cell.width <= 0 || cell.height <= 0) {
+            return null;
+        }
+        return { width: cell.width, height: cell.height };
+    }
+
+    private getScreenContentOrigin(): { left: number; top: number } | null {
+        const screenElem =
+            (this.terminal.element?.querySelector(".xterm-screen") as HTMLElement | null) ?? this.terminal.element;
+        if (screenElem == null) {
+            return null;
+        }
+        const screenRect = screenElem.getBoundingClientRect();
+        const elementStyle = window.getComputedStyle(screenElem);
+        const leftPadding = Number.parseFloat(elementStyle.paddingLeft) || 0;
+        const topPadding = Number.parseFloat(elementStyle.paddingTop) || 0;
+        return {
+            left: screenRect.left + leftPadding,
+            top: screenRect.top + topPadding,
+        };
+    }
+
+    // getSelectionPosition() returns 0-based buffer coordinates (not the 1-based API docs).
+    private getSelectionEndAnchor(selectionPos: {
+        start: { x: number; y: number };
+        end: { x: number; y: number };
+    }): { x: number; y: number } {
+        let { x, y } = selectionPos.end;
+        if (x <= 0 && y > selectionPos.start.y) {
+            return { x: this.terminal.cols, y: y - 1 };
+        }
+        return { x, y };
+    }
+
+    private selectionBufferColToClientX(col: number): number {
+        const origin = this.getScreenContentOrigin();
+        const dims = this.getRenderCellDimensions();
+        if (origin == null || dims == null) {
+            return this.bufferCellToClientOffset({ x: col + 1, y: 1 }, false).x;
+        }
+        return origin.left + col * dims.width;
+    }
+
+    private selectionBufferRowToClientBottom(row: number): number {
+        const origin = this.getScreenContentOrigin();
+        const dims = this.getRenderCellDimensions();
+        if (origin == null || dims == null) {
+            return this.bufferCellToClientOffset({ x: 1, y: row + 1 }, true).y;
+        }
+        const viewportY = this.terminal.buffer.active.viewportY;
+        const rowInView = row - viewportY;
+        return origin.top + (rowInView + 1) * dims.height;
+    }
+
+    private getSelectionDivAnchorY(selectionDiv: HTMLElement): number | null {
+        const styleTop = Number.parseFloat(selectionDiv.style.top);
+        const styleHeight = Number.parseFloat(selectionDiv.style.height);
+        if (!Number.isFinite(styleTop) || !Number.isFinite(styleHeight) || styleHeight <= 0) {
+            return null;
+        }
+        const origin = this.getScreenContentOrigin();
+        if (origin == null) {
+            return null;
+        }
+        return origin.top + styleTop + styleHeight;
+    }
+
+    private getSelectionDivAnchorX(selectionDiv: HTMLElement, edge: "left" | "right"): number | null {
+        const styleLeft = Number.parseFloat(selectionDiv.style.left);
+        const styleWidth = Number.parseFloat(selectionDiv.style.width);
+        if (!Number.isFinite(styleLeft) || !Number.isFinite(styleWidth)) {
+            return null;
+        }
+        const origin = this.getScreenContentOrigin();
+        if (origin == null) {
+            return null;
+        }
+        return edge === "left" ? origin.left + styleLeft : origin.left + styleLeft + styleWidth;
+    }
+
     getSelectionHandlePositions(): {
         start: { left: number; top: number };
         end: { left: number; top: number };
@@ -434,41 +523,53 @@ export class TermWrap {
             return null;
         }
         const connectRect = this.connectElem.getBoundingClientRect();
+        const endAnchor = this.getSelectionEndAnchor(selectionPos);
         const selectionElem = this.terminal.element?.querySelector(".xterm-selection");
         const selectionDivs = selectionElem
             ? Array.from(selectionElem.querySelectorAll<HTMLElement>("div")).filter(
                   (div) => div.offsetWidth > 0 || div.offsetHeight > 0
               )
             : [];
+        const startClient = {
+            left: this.selectionBufferColToClientX(selectionPos.start.x),
+            top: this.selectionBufferRowToClientBottom(selectionPos.start.y),
+        };
+        const endClient = {
+            left: this.selectionBufferColToClientX(endAnchor.x),
+            top: this.selectionBufferRowToClientBottom(endAnchor.y),
+        };
         if (selectionDivs.length > 0) {
-            const firstRect = selectionDivs[0].getBoundingClientRect();
-            const lastRect = selectionDivs[selectionDivs.length - 1].getBoundingClientRect();
-            const forward =
-                selectionPos.start.y < selectionPos.end.y ||
-                (selectionPos.start.y === selectionPos.end.y && selectionPos.start.x <= selectionPos.end.x);
-            if (forward) {
-                return {
-                    start: {
-                        left: firstRect.left - connectRect.left,
-                        top: firstRect.bottom - connectRect.top,
-                    },
-                    end: { left: lastRect.right - connectRect.left, top: lastRect.bottom - connectRect.top },
-                };
-            }
+            const firstDiv = selectionDivs[0];
+            const lastDiv = selectionDivs[selectionDivs.length - 1];
+            startClient.left = this.getSelectionDivAnchorX(firstDiv, "left") ?? startClient.left;
+            startClient.top = this.getSelectionDivAnchorY(firstDiv) ?? startClient.top;
+            endClient.left = this.getSelectionDivAnchorX(lastDiv, "right") ?? endClient.left;
+            endClient.top = this.getSelectionDivAnchorY(lastDiv) ?? endClient.top;
+        }
+        const forward =
+            selectionPos.start.y < selectionPos.end.y ||
+            (selectionPos.start.y === selectionPos.end.y && selectionPos.start.x <= selectionPos.end.x);
+        if (forward) {
             return {
-                start: { left: lastRect.right - connectRect.left, top: lastRect.bottom - connectRect.top },
-                end: { left: firstRect.left - connectRect.left, top: firstRect.bottom - connectRect.top },
+                start: {
+                    left: startClient.left - connectRect.left,
+                    top: startClient.top - connectRect.top,
+                },
+                end: {
+                    left: endClient.left - connectRect.left,
+                    top: endClient.top - connectRect.top,
+                },
             };
         }
-        const startLeft = this.bufferCellToClientOffset(selectionPos.start, false);
-        const startBottom = this.bufferCellToClientOffset(selectionPos.start, true);
-        const endClient = this.bufferCellToClientOffset(selectionPos.end, true);
         return {
             start: {
-                left: startLeft.x - connectRect.left,
-                top: startBottom.y - connectRect.top,
+                left: endClient.left - connectRect.left,
+                top: startClient.top - connectRect.top,
             },
-            end: { left: endClient.x - connectRect.left, top: endClient.y - connectRect.top },
+            end: {
+                left: startClient.left - connectRect.left,
+                top: endClient.top - connectRect.top,
+            },
         };
     }
 
@@ -686,11 +787,19 @@ export class TermWrap {
     }
 
     private bufferCellToClientOffset(cell: { x: number; y: number }, endOfCell: boolean): { x: number; y: number } {
-        const lineHeight = this.getTouchScrollLineHeight();
-        const charWidth = this.getCharWidth();
         const viewportY = this.terminal.buffer.active.viewportY;
         const rowInView = cell.y - 1 - viewportY;
         const col = cell.x - 1 + (endOfCell ? 1 : 0);
+        const origin = this.getScreenContentOrigin();
+        const dims = this.getRenderCellDimensions();
+        if (origin != null && dims != null) {
+            return {
+                x: origin.left + col * dims.width,
+                y: origin.top + rowInView * dims.height + (endOfCell ? dims.height : 0),
+            };
+        }
+        const lineHeight = this.getTouchScrollLineHeight();
+        const charWidth = this.getCharWidth();
         const rowsElem = this.terminal.element?.querySelector(".xterm-rows") as HTMLElement | null;
         const screenElem =
             (this.terminal.element?.querySelector(".xterm-screen") as HTMLElement | null) ?? this.terminal.element;
@@ -706,6 +815,10 @@ export class TermWrap {
     }
 
     private getCharWidth(): number {
+        const dims = this.getRenderCellDimensions();
+        if (dims != null) {
+            return dims.width;
+        }
         const rowElem = this.connectElem.querySelector(".xterm-rows > div") as HTMLElement | null;
         if (rowElem != null && this.terminal.cols > 0) {
             return rowElem.clientWidth / this.terminal.cols;
@@ -715,6 +828,10 @@ export class TermWrap {
     }
 
     private getTouchScrollLineHeight(): number {
+        const dims = this.getRenderCellDimensions();
+        if (dims != null) {
+            return dims.height;
+        }
         const rowElem = this.connectElem.querySelector(".xterm-rows > div") as HTMLElement | null;
         if (rowElem?.offsetHeight) {
             return rowElem.offsetHeight;

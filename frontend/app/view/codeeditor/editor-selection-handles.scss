@@ -5,5 +5,9 @@
 @use "../term/term-selection-handles.scss";
 
 .editor-selection-handles {
-    display: contents;
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 10000;
 }

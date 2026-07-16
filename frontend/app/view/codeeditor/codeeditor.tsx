@@ -132,8 +132,13 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
         opts.wordWrap = wordWrap ? "on" : "off";
         opts.fontSize = fontSize;
         opts.copyWithSyntaxHighlighting = false;
+        if (touchTextSelectEnabled) {
+            opts.roundedSelection = false;
+            opts.selectionHighlight = false;
+            opts.occurrencesHighlight = "off";
+        }
         return opts;
-    }, [minimapEnabled, stickyScrollEnabled, wordWrap, fontSize, readonly]);
+    }, [minimapEnabled, stickyScrollEnabled, wordWrap, fontSize, readonly, touchTextSelectEnabled]);
 
     return (
         <div
@@ -142,7 +147,7 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
                 touchTextSelectEnabled ? "editor-touchtextselect-enabled" : "editor-touchtextselect-disabled"
             )}
         >
-            <div className="flex flex-col h-full w-full" ref={divRef}>
+            <div className="codeeditor-inner-wrap flex flex-col h-full w-full" ref={divRef}>
                 <MonacoCodeEditor
                     readonly={readonly}
                     text={text}
@@ -152,8 +157,12 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
                     path={editorPath}
                     language={language}
                 />
+                <EditorSelectionHandles
+                    controller={handlesController}
+                    blockId={blockId}
+                    offsetElemRef={divRef}
+                />
             </div>
-            <EditorSelectionHandles controller={handlesController} blockId={blockId} />
         </div>
     );
 }

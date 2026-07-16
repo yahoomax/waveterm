@@ -4,6 +4,38 @@
 .codeeditor-wrap {
     position: relative;
 
+    .codeeditor-inner-wrap {
+        position: relative;
+        overflow: visible;
+        min-height: 0;
+    }
+
+    // Monaco paints its own selection; block native selection to avoid ghost highlights on touch.
+    .monaco-editor,
+    .monaco-editor *,
+    .monaco-editor .view-lines,
+    .monaco-editor .view-line,
+    .monaco-editor .inputarea,
+    .monaco-editor .monaco-mouse-cursor-text {
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+    }
+
+    .monaco-editor .inputarea {
+        -webkit-text-fill-color: transparent !important;
+        color: transparent !important;
+    }
+
+    .monaco-editor .view-lines *::selection,
+    .monaco-editor .view-line *::selection,
+    .monaco-editor .inputarea::selection,
+    .monaco-editor .inputarea::-moz-selection {
+        background: transparent !important;
+        background-color: transparent !important;
+        color: transparent !important;
+    }
+
     &.editor-touchtextselect-enabled {
         touch-action: pan-y;
         -webkit-touch-callout: none;
@@ -16,14 +48,5 @@
     &.editor-touchtextselect-disabled {
         touch-action: pan-y;
         -webkit-touch-callout: none;
-        user-select: none;
-        -webkit-user-select: none;
-
-        .monaco-editor,
-        .monaco-editor .view-lines,
-        .monaco-editor .view-line {
-            user-select: none !important;
-            -webkit-user-select: none !important;
-        }
     }
 }

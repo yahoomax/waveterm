@@ -33,11 +33,13 @@ function SelectionHandleIcon({ variant }: { variant: "start" | "end" }) {
 interface EditorSelectionHandlesProps {
     controller: EditorTouchSelectController | null;
     blockId: string;
+    offsetElemRef: React.RefObject<HTMLElement | null>;
 }
 
 export const EditorSelectionHandles = React.memo(function EditorSelectionHandles({
     controller,
     blockId,
+    offsetElemRef,
 }: EditorSelectionHandlesProps) {
     const touchSelectEnabled = useAtomValueSafe(getOverrideConfigAtom(blockId, "editor:touchtextselect")) !== false;
     const [positions, setPositions] = React.useState<HandleRenderPositions | null>(null);
@@ -62,8 +64,7 @@ export const EditorSelectionHandles = React.memo(function EditorSelectionHandles
             return;
         }
         const containerRect = container.getBoundingClientRect();
-        const offsetParent = container.parentElement;
-        const offsetRect = offsetParent?.getBoundingClientRect() ?? containerRect;
+        const offsetRect = offsetElemRef.current?.getBoundingClientRect() ?? containerRect;
         setPositions({
             start: {
                 left: containerRect.left + tips.start.left - offsetRect.left,
@@ -74,7 +75,7 @@ export const EditorSelectionHandles = React.memo(function EditorSelectionHandles
                 top: containerRect.top + tips.end.top - offsetRect.top,
             },
         });
-    }, [controller, touchSelectEnabled]);
+    }, [controller, touchSelectEnabled, offsetElemRef]);
 
     const scheduleUpdate = React.useCallback(() => {
         if (rafRef.current != null) {
@@ -101,8 +102,9 @@ export const EditorSelectionHandles = React.memo(function EditorSelectionHandles
 
         const resizeObserver = new ResizeObserver(scheduleUpdate);
         resizeObserver.observe(container);
-        if (container.parentElement != null) {
-            resizeObserver.observe(container.parentElement);
+        const offsetElem = offsetElemRef.current;
+        if (offsetElem != null) {
+            resizeObserver.observe(offsetElem);
         }
         window.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
 
@@ -116,7 +118,7 @@ export const EditorSelectionHandles = React.memo(function EditorSelectionHandles
                 rafRef.current = null;
             }
         };
-    }, [controller, touchSelectEnabled, scheduleUpdate]);
+    }, [controller, touchSelectEnabled, scheduleUpdate, offsetElemRef]);
 
     const startAdjust = React.useCallback(
         (handle: "start" | "end", clientX: number, clientY: number) => {

@@ -1157,6 +1157,7 @@ declare global {
         "editor:fontsize"?: number;
         "editor:touchtextselect"?: boolean;
         "editor:copyonselect"?: boolean;
+        "editor:extendedsyntax"?: boolean;
         "graph:*"?: boolean;
         "graph:numpoints"?: number;
         "graph:metrics"?: string[];
@@ -1444,6 +1445,7 @@ declare global {
         "editor:inlinediff"?: boolean;
         "editor:touchtextselect"?: boolean;
         "editor:copyonselect"?: boolean;
+        "editor:extendedsyntax"?: boolean;
         "web:*"?: boolean;
         "web:openlinksinternally"?: boolean;
         "web:defaulturl"?: string;

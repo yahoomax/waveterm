@@ -207,6 +207,9 @@
         "editor:copyonselect": {
           "type": "boolean"
         },
+        "editor:extendedsyntax": {
+          "type": "boolean"
+        },
         "web:*": {
           "type": "boolean"
         },

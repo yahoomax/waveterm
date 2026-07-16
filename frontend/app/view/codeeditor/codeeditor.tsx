@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { MonacoCodeEditor } from "@/app/monaco/monaco-react";
+import { resolveEditorLanguageFromProps } from "@/app/monaco/editor-languages";
 import { useOverrideConfigAtom } from "@/app/store/global";
 import { boundNumber } from "@/util/util";
 import clsx from "clsx";
@@ -55,6 +56,7 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
     const wordWrap = useOverrideConfigAtom(blockId, "editor:wordwrap") ?? false;
     const fontSize = boundNumber(useOverrideConfigAtom(blockId, "editor:fontsize"), 6, 64);
     const touchTextSelectEnabled = useOverrideConfigAtom(blockId, "editor:touchtextselect") !== false;
+    const extendedSyntaxEnabled = useOverrideConfigAtom(blockId, "editor:extendedsyntax") !== false;
     const uuidRef = useRef(crypto.randomUUID()).current;
     let editorPath: string;
     if (fileName) {
@@ -140,6 +142,11 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
         return opts;
     }, [minimapEnabled, stickyScrollEnabled, wordWrap, fontSize, readonly, touchTextSelectEnabled]);
 
+    const resolvedLanguage = useMemo(
+        () => resolveEditorLanguageFromProps(fileName, language, extendedSyntaxEnabled),
+        [fileName, language, extendedSyntaxEnabled]
+    );
+
     return (
         <div
             className={clsx(
@@ -155,7 +162,7 @@ export function CodeEditor({ blockId, text, language, fileName, readonly, onChan
                     onChange={handleEditorChange}
                     onMount={handleEditorOnMount}
                     path={editorPath}
-                    language={language}
+                    language={resolvedLanguage}
                 />
                 <EditorSelectionHandles
                     controller={handlesController}

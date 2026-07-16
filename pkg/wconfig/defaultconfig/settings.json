@@ -41,6 +41,7 @@
 	"term:touchtextselect": true,
 	"editor:touchtextselect": true,
 	"editor:copyonselect": true,
+	"editor:extendedsyntax": true,
 	"term:trimtrailingwhitespace": true,
 	"term:durable": false,
 	"waveai:showcloudmodes": true,

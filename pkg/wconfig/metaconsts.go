@@ -73,6 +73,7 @@ const (
 	ConfigKey_EditorInlineDiff               = "editor:inlinediff"
 	ConfigKey_EditorTouchTextSelect          = "editor:touchtextselect"
 	ConfigKey_EditorCopyOnSelect             = "editor:copyonselect"
+	ConfigKey_EditorExtendedSyntax           = "editor:extendedsyntax"
 
 	ConfigKey_WebClear                       = "web:*"
 	ConfigKey_WebOpenLinksInternally         = "web:openlinksinternally"

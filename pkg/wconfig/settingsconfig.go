@@ -124,6 +124,7 @@ type SettingsType struct {
 	EditorInlineDiff          bool    `json:"editor:inlinediff,omitempty"`
 	EditorTouchTextSelect     *bool   `json:"editor:touchtextselect,omitempty"`
 	EditorCopyOnSelect        *bool   `json:"editor:copyonselect,omitempty"`
+	EditorExtendedSyntax      *bool   `json:"editor:extendedsyntax,omitempty"`
 
 	WebClear               bool   `json:"web:*,omitempty"`
 	WebOpenLinksInternally bool   `json:"web:openlinksinternally,omitempty"`

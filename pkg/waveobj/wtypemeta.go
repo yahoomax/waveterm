@@ -88,6 +88,7 @@ type MetaTSType struct {
 	EditorFontSize            float64 `json:"editor:fontsize,omitempty"`
 	EditorTouchTextSelect     *bool   `json:"editor:touchtextselect,omitempty"`
 	EditorCopyOnSelect        *bool   `json:"editor:copyonselect,omitempty"`
+	EditorExtendedSyntax      *bool   `json:"editor:extendedsyntax,omitempty"`
 
 	GraphClear     bool     `json:"graph:*,omitempty"`
 	GraphNumPoints int      `json:"graph:numpoints,omitempty"`

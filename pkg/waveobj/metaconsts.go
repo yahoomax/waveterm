@@ -86,6 +86,7 @@ const (
 	MetaKey_EditorFontSize                   = "editor:fontsize"
 	MetaKey_EditorTouchTextSelect            = "editor:touchtextselect"
 	MetaKey_EditorCopyOnSelect               = "editor:copyonselect"
+	MetaKey_EditorExtendedSyntax             = "editor:extendedsyntax"
 
 	MetaKey_GraphClear                       = "graph:*"
 	MetaKey_GraphNumPoints                   = "graph:numpoints"
